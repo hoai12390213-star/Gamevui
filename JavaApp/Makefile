@@ -7,7 +7,7 @@ CLASSES := $(SOURCES:$(SOURCEDIR)/%.java=$(OUTPUTDIR)/%.class)
 
 TARGETS := $(shell find $(SOURCEDIR) -mindepth 1 -maxdepth 1 -type d)
 TARGETS := $(TARGETS:$(SOURCEDIR)/%=$(OUTPUTDIR)/%.jar)
-TARGETS += $(OUTPUTDIR)/lwjgl-3.3.3.jar $(OUTPUTDIR)/lwjgl-3.3.6.jar $(OUTPUTDIR)/lwjgl-3.4.1.jar $(OUTPUTDIR)/cacio-init-agent.jar
+TARGETS += $(OUTPUTDIR)/lwjgl-3.3.1.jar $(OUTPUTDIR)/lwjgl-3.3.3.jar $(OUTPUTDIR)/lwjgl-3.3.6.jar $(OUTPUTDIR)/lwjgl-3.4.1.jar $(OUTPUTDIR)/cacio-init-agent.jar
 
 # Add all jars to classpath and allow compiling with private API
 JCFLAGS := -cp "$(subst $() $(),:,$(wildcard $(SOURCEDIR)/*/):$(wildcard libs/*/*.jar))" -XDignore.symbol.file
@@ -50,6 +50,17 @@ $(OUTPUTDIR)/launcher.jar: $(CLASSES)
 	# sees "Modules launcher and lwjgl export package com.apple.ios.audio" and
 	# aborts with a ResolutionException. The class files must stay on disk
 	# so they keep working from the launcher jar.
+
+# Build LWJGL 3.3.1
+$(OUTPUTDIR)/lwjgl-3.3.1.jar: $(CLASSES)
+	@set -e
+	@echo "Creating $@"
+	@mkdir -p $(OUTPUTDIR)/lwjgl31_lib
+	@cd $(OUTPUTDIR)/lwjgl31_lib && $(BOOTJDK)/jar -xf "../../../lwjgl.jar" && rm -rf META-INF
+	@cd $(OUTPUTDIR)/lwjgl31_lib && find ../../libs/lwjgl31 -name 'lwjgl*.jar' ! -name 'lwjgl.jar' -exec $(BOOTJDK)/jar -xf {} \; && rm -rf META-INF
+	@cd $(OUTPUTDIR)/lwjgl31_lib && $(BOOTJDK)/jar -xf "../../libs/lwjgl31/lwjgl.jar" && rm -rf META-INF
+	@cp -R $(OUTPUTDIR)/lwjgl/* $(OUTPUTDIR)/lwjgl31_lib/
+	@$(BOOTJDK)/jar -cf $@ -C $(OUTPUTDIR)/lwjgl31_lib .
 
 # Build LWJGL 3.3.3
 $(OUTPUTDIR)/lwjgl-3.3.3.jar: $(CLASSES)
