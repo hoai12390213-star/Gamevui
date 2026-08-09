@@ -1,204 +1,960 @@
-#import "SidebarViewController.h"
+#import "SettingsViewController.h"
 #import "ThemeManager.h"
-#import "HapticManager.h"
 #import "LauncherPreferences.h"
-#import "UIView+LiquidGlass.h"
+#import "utils.h"
+#import "HapticManager.h"
+#import "ios_uikit_bridge.h"
+#import "CurseForgeService.h"
+#import "CustomControlsViewController.h"
+#import <PhotosUI/PhotosUI.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
-@interface SidebarTabItem : UIView
-@property (nonatomic) UIImageView *iconView;
-@property (nonatomic) UILabel *titleLabel;
-@property (nonatomic) UIView *indicatorView;
-@property (nonatomic) BOOL isSelected;
-@property (nonatomic, copy) void (^tapHandler)(void);
+@interface SettingsViewController () <UITableViewDelegate, UITableViewDataSource, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UIColorPickerViewControllerDelegate, UINavigationControllerDelegate, UIImagePickerControllerDelegate, PHPickerViewControllerDelegate>
+@property (nonatomic) UITableView *tableView;
+@property (nonatomic) UICollectionView *tabGridView;
+@property (nonatomic) NSLayoutConstraint *tabGridHeightConstraint;
+@property (nonatomic) NSArray *sections;
+@property (nonatomic) NSInteger selectedSectionIndex;
+@property (nonatomic, copy) void (^pendingColorPickCallback)(UIColor *);
 @end
 
-@implementation SidebarTabItem
+@interface SettingsTabCell : UICollectionViewCell
+@property (nonatomic) UIImageView *iconView;
+@property (nonatomic) UILabel *titleLabel;
+@end
 
-- (instancetype)initWithIcon:(NSString *)iconName title:(NSString *)title {
-    self = [super initWithFrame:CGRectZero];
+@implementation SettingsTabCell
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
     if (self) {
-        self.translatesAutoresizingMaskIntoConstraints = NO;
+        self.contentView.layer.cornerRadius = 14;
+        self.contentView.layer.masksToBounds = YES;
+        self.contentView.layer.borderWidth = 1;
 
-        _iconView = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:iconName]];
+        _iconView = [[UIImageView alloc] init];
         _iconView.translatesAutoresizingMaskIntoConstraints = NO;
         _iconView.contentMode = UIViewContentModeScaleAspectFit;
-        [self addSubview:_iconView];
+        [self.contentView addSubview:_iconView];
 
         _titleLabel = [[UILabel alloc] init];
         _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-        _titleLabel.font = [UIFont systemFontOfSize:9 weight:UIFontWeightMedium];
         _titleLabel.textAlignment = NSTextAlignmentCenter;
-        _titleLabel.text = title;
-        [self addSubview:_titleLabel];
+        _titleLabel.numberOfLines = 2;
+        _titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+        [self.contentView addSubview:_titleLabel];
 
-        _indicatorView = [[UIView alloc] init];
-        _indicatorView.translatesAutoresizingMaskIntoConstraints = NO;
-        _indicatorView.layer.cornerRadius = 1.5;
-        _indicatorView.hidden = YES;
-        [self addSubview:_indicatorView];
-
-        _iconView.translatesAutoresizingMaskIntoConstraints = NO;
         [NSLayoutConstraint activateConstraints:@[
-            [_iconView.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
-            [NSLayoutConstraint constraintWithItem:_iconView attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:self attribute:NSLayoutAttributeCenterY multiplier:1.0 constant:-8],
+            [_iconView.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
+            [_iconView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:16],
             [_iconView.widthAnchor constraintEqualToConstant:24],
             [_iconView.heightAnchor constraintEqualToConstant:24],
 
-            [_titleLabel.topAnchor constraintEqualToAnchor:_iconView.bottomAnchor constant:2],
-            [_titleLabel.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
-            [_titleLabel.leadingAnchor constraintGreaterThanOrEqualToAnchor:self.leadingAnchor constant:2],
-            [_titleLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.trailingAnchor constant:-2],
-
-            [_indicatorView.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:2],
-            [_indicatorView.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
-            [_indicatorView.widthAnchor constraintEqualToConstant:3],
-            [_indicatorView.heightAnchor constraintEqualToConstant:16],
+            [_titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:8],
+            [_titleLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-8],
+            [_titleLabel.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
+            [_titleLabel.topAnchor constraintEqualToAnchor:_iconView.bottomAnchor constant:10],
         ]];
-
-        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(didTap)];
-        [self addGestureRecognizer:tap];
     }
     return self;
 }
 
-- (void)didTap {
-    if (self.tapHandler) self.tapHandler();
-}
-
-- (void)setIsSelected:(BOOL)isSelected {
-    _isSelected = isSelected;
-    self.indicatorView.hidden = !isSelected;
-}
-
 @end
 
-@interface SidebarViewController ()
-@property (nonatomic) NSArray<SidebarTabItem *> *items;
-@property (nonatomic) UIView *stackContainer;
-@end
-
-@implementation SidebarViewController
+@implementation SettingsViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    [self buildSections];
+    _selectedSectionIndex = 0;
+    [self setup];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(updateColors) name:ThemeDidChangeNotification object:nil];
+    [self updateColors];
+}
 
-    self.stackContainer = [[UIView alloc] init];
-    self.stackContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:self.stackContainer];
+- (void)buildSections {
+    NSArray *rendererOptions = [self getRendererOptions];
 
-    NSArray *tabConfig = @[
-        @{@"icon": @"gamecontroller", @"title": @"Game"},
-        @{@"icon": @"wrench.adjustable", @"title": @"Mod"},
-        @{@"icon": @"shippingbox", @"title": @"Modpack"},
-        @{@"icon": @"paintpalette", @"title": @"Shader"},
-        @{@"icon": @"paintbrush.fill", @"title": @"Resource Pack"},
-        @{@"icon": @"server.rack", @"title": @"Server"},
-        @{@"icon": @"map", @"title": @"Maps"},
+    NSArray *lwjglOptions = getLwjglVersionsWithAuto();
+    NSMutableArray *lwjglItems = [NSMutableArray array];
+    for (NSString *ver in lwjglOptions) {
+        [lwjglItems addObject:ver];
+    }
+
+    NSArray *glVersions = @[@"0", @"3.0", @"3.1", @"3.2", @"3.3", @"4.0", @"4.1", @"4.2", @"4.3", @"4.4", @"4.5", @"4.6"];
+    NSArray *zinkOptLevels = @[@"-1", @"0", @"1", @"2", @"3", @"4", @"5"];
+
+    _sections = @[
+        @{@"title": localize(@"Render", nil), @"icon": @"display", @"items": @[
+            @{@"type": @"picker", @"label": localize(@"preference.title.renderer", nil), @"key": @"video.renderer", @"options": rendererOptions, @"default": @"auto"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.resolution", nil), @"key": @"video.resolution", @"min": @25, @"max": @150, @"suffix": @"%"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.max_framerate", nil), @"key": @"video.max_framerate"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.performance_hud", nil), @"key": @"video.performance_hud"},
+        ]},
+        @{@"title": localize(@"Custom Controls", nil), @"icon": @"slider.horizontal.3", @"items": @[
+            @{@"type": @"slider", @"label": localize(@"preference.title.button_scale", nil), @"key": @"control.button_scale", @"min": @30, @"max": @200, @"suffix": @"%"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.mouse_scale", nil), @"key": @"control.mouse_scale", @"min": @30, @"max": @200, @"suffix": @"%"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.mouse_speed", nil), @"key": @"control.mouse_speed", @"min": @10, @"max": @300, @"suffix": @"%"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.virtmouse_enable", nil), @"key": @"control.virtmouse_enable"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.gyroscope_enable", nil), @"key": @"control.gyroscope_enable"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.gyroscope_invert_x_axis", nil), @"key": @"control.gyroscope_invert_x_axis"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.gyroscope_sensitivity", nil), @"key": @"control.gyroscope_sensitivity", @"min": @10, @"max": @300, @"suffix": @"%"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.slideable_hotbar", nil), @"key": @"control.slideable_hotbar"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.gesture_mouse", nil), @"key": @"control.gesture_mouse"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.gesture_hotbar", nil), @"key": @"control.gesture_hotbar"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.recording_hide", nil), @"key": @"control.recording_hide"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.disable_haptics", nil), @"key": @"control.disable_haptics"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.press_duration", nil), @"key": @"control.press_duration", @"min": @100, @"max": @1000, @"suffix": @"ms"},
+            @{@"type": @"navigate", @"label": localize(@"Mouse Cursors", nil), @"vc": @"CursorManageViewController"},
+            @{@"type": @"navigate", @"label": localize(@"Edit Controls Layout", nil), @"vc": @"CustomControlsViewController"},
+        ]},
+        @{@"title": localize(@"Game", nil), @"icon": @"gamecontroller.fill", @"items": @[
+            @{@"type": @"picker", @"label": localize(@"LWJGL Version", nil), @"key": @"java.lwjgl_version", @"options": lwjglItems, @"default": @"(auto)"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.fullscreen_airplay", nil), @"key": @"video.fullscreen_airplay"},
+        ]},
+        @{@"title": localize(@"Audio", nil), @"icon": @"speaker.wave.3.fill", @"items": @[
+            @{@"type": @"switch", @"label": localize(@"preference.title.allow_microphone", nil), @"key": @"video.allow_microphone"},
+            @{@"type": @"picker", @"label": localize(@"preference.title.microphone_source", nil), @"key": @"video.microphone_source", @"options": @[@"auto", @"front", @"bottom", @"back"], @"default": @"auto"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.silence_other_audio", nil), @"key": @"video.silence_other_audio"},
+        ]},
+        @{@"title": localize(@"Gamepad", nil), @"icon": @"dpad.fill", @"items": @[
+            @{@"type": @"picker", @"label": localize(@"preference.title.default_gamepad_ctrl", nil), @"key": @"control.controller_type", @"options": @[@"none", @"mfi", @"ps4", @"ps5", @"xbox"], @"default": @"none"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.gamepad_sensitivity", nil), @"key": @"control.gamepad_sensitivity", @"min": @10, @"max": @300, @"suffix": @"%"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.hardware_hide", nil), @"key": @"control.hardware_hide"},
+            @{@"type": @"navigate", @"label": localize(@"Gamepad Layout", nil), @"vc": @"LauncherPrefContCfgViewController"},
+        ]},
+        @{@"title": localize(@"Launcher", nil), @"icon": @"terminal.fill", @"items": @[
+            @{@"type": @"navigate", @"label": localize(@"preference.title.game_directory", nil), @"vc": @"LauncherPrefGameDirViewController"},
+            @{@"type": @"navigate", @"label": localize(@"preference.title.manage_runtime", nil) , @"vc": @"LauncherPrefManageJREViewController"},
+            @{@"type": @"text", @"label": localize(@"preference.title.java_args", nil), @"key": @"java.java_args", @"placeholder": @"-Xmx2G -Xms512M"},
+            @{@"type": @"text", @"label": localize(@"preference.title.env_variables", nil), @"key": @"java.env_variables", @"placeholder": @"VAR=value"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.allocated_memory", nil), @"key": @"java.allocated_memory", @"min": @256, @"max": @((NSProcessInfo.processInfo.physicalMemory / 1048576) * 0.85), @"suffix": @"MB"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.auto_ram", nil), @"key": @"java.auto_ram"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.check_sha", nil), @"key": @"general.check_sha"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.cosmetica", nil), @"key": @"general.cosmetica"},
+            @{@"type": @"switch", @"label": @"Lock Landscape", @"key": @"general.lock_landscape"},
+            @{@"type": @"picker", @"label": localize(@"Theme", nil), @"key": @"launcher.theme", @"options": @[@"System", @"Dark", @"Light"], @"default": @"System"},
+            @{@"type": @"text", @"label": localize(@"CurseForge API Key", nil), @"key": @"curseforge.api_key", @"placeholder": localize(@"Paste your CurseForge API key here", nil)},
+            @{@"type": @"switch", @"label": localize(@"preference.title.debug_logging", nil), @"key": @"general.debug_logging"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.debug_ipad_ui", nil), @"key": @"debug.debug_ipad_ui"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.debug_skip_wait_jit", nil), @"key": @"debug.debug_skip_wait_jit"},
+        ]},
+        @{@"title": localize(@"MobileGlues", nil), @"icon": @"cube.transparent.fill", @"items": @[
+            @{@"type": @"switch", @"label": localize(@"preference.title.enable_angle", nil), @"key": @"mobileglues.enable_angle"},
+            @{@"type": @"picker", @"label": localize(@"preference.title.enable_no_error", nil), @"key": @"mobileglues.enable_no_error", @"options": @[@"0", @"1", @"2"], @"default": @"0"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.enable_ext_timer_query", nil), @"key": @"mobileglues.enable_ext_timer_query"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.enable_ext_compute_shader", nil), @"key": @"mobileglues.enable_ext_compute_shader"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.enable_ext_direct_state_access", nil), @"key": @"mobileglues.enable_ext_direct_state_access"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.max_glsl_cache_size", nil), @"key": @"mobileglues.max_glsl_cache_size", @"min": @8, @"max": @512, @"suffix": @"MB"},
+            @{@"type": @"picker", @"label": localize(@"preference.title.multidraw_mode", nil), @"key": @"mobileglues.multidraw_mode", @"options": @[@"0", @"1", @"2", @"3"], @"default": @"0"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.angle_depth_clear_fix_mode", nil), @"key": @"mobileglues.angle_depth_clear_fix_mode"},
+            @{@"type": @"picker", @"label": localize(@"preference.title.custom_gl_version", nil), @"key": @"mobileglues.custom_gl_version", @"options": glVersions, @"default": @"0"},
+            @{@"type": @"picker", @"label": localize(@"preference.title.fsr1_setting", nil), @"key": @"mobileglues.fsr1_setting", @"options": @[@"0", @"1", @"2", @"3", @"4", @"5"], @"default": @"0"},
+        ]},
+        @{@"title": localize(@"Zink", nil), @"icon": @"triangle.fill", @"items": @[
+            @{@"type": @"picker", @"label": localize(@"Optimization Level", nil), @"key": @"zink.optimization_level", @"options": zinkOptLevels, @"default": @"-1"},
+            @{@"type": @"picker", @"label": localize(@"preference.title.zink_gl_override", nil), @"key": @"zink.gl_override", @"options": @[@"0", @"3.3", @"4.0", @"4.1", @"4.3", @"4.6"], @"default": @"0"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.zink_enable_gl_thread", nil), @"key": @"zink.enable_gl_thread"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.zink_glsl_cache_size", nil), @"key": @"zink.glsl_cache_size", @"min": @8, @"max": @512, @"suffix": @"MB"},
+            @{@"type": @"picker", @"label": localize(@"preference.title.zink_api_features", nil), @"key": @"zink.api_features", @"options": @[@"0", @"1", @"2", @"3"], @"default": @"3"},
+        ]},
+        @{@"title": localize(@"Debug", nil), @"icon": @"ladybug.fill", @"items": @[
+            @{@"type": @"switch", @"label": localize(@"preference.title.debug_always_attached_jit", nil), @"key": @"debug.debug_always_attached_jit"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.debug_hide_home_indicator", nil), @"key": @"debug.debug_hide_home_indicator"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.debug_auto_correction", nil), @"key": @"debug.debug_auto_correction"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.debug_server_enabled", nil), @"key": @"debug.debug_server_enabled"},
+            @{@"type": @"text", @"label": localize(@"Debug Server Port", nil), @"key": @"debug.debug_server_port", @"placeholder": @"9090"},
+            @{@"type": @"text", @"label": localize(@"Debug Server Token", nil), @"key": @"debug.debug_server_token", @"placeholder": @""},
+            @{@"type": @"switch", @"label": localize(@"preference.title.debug_server_localhost_only", nil), @"key": @"debug.debug_server_localhost_only"},
+        ]},
+        @{@"title": localize(@"Appearance", nil), @"icon": @"paintbrush.pointed.fill", @"items": @[
+            @{@"type": @"color", @"label": localize(@"Accent Color", nil), @"key": @"amethyst_accent_color"},
+            @{@"type": @"color", @"label": localize(@"Background Color", nil), @"key": @"amethyst_bg_color"},
+            @{@"type": @"color", @"label": localize(@"Sidebar Color", nil), @"key": @"amethyst_sidebar_bg_color"},
+            @{@"type": @"color", @"label": localize(@"Top Bar Color", nil), @"key": @"amethyst_topbar_bg_color"},
+            @{@"type": @"color", @"label": localize(@"Right Panel Color", nil), @"key": @"amethyst_rightpanel_bg_color"},
+            @{@"type": @"color", @"label": localize(@"Content Card Color", nil), @"key": @"amethyst_card_bg_color"},
+            @{@"type": @"image", @"label": localize(@"Background", nil)},
+            @{@"type": @"slider", @"label": localize(@"UI Opacity", nil), @"key": @"amethyst_ui_opacity", @"min": @0, @"max": @100, @"suffix": @"%"},
+            @{@"type": @"slider", @"label": localize(@"Background Blur", nil), @"key": @"amethyst_bg_blur", @"min": @0, @"max": @20, @"suffix": @""},
+            @{@"type": @"color", @"label": localize(@"Reset Appearance", nil), @"key": @"amethyst_reset_appearance"},
+        ]},
     ];
 
-    NSMutableArray *itemArray = [NSMutableArray array];
-    SidebarTabItem *prevItem = nil;
-    for (int i = 0; i < tabConfig.count; i++) {
-        NSDictionary *config = tabConfig[i];
-        SidebarTabItem *item = [[SidebarTabItem alloc] initWithIcon:config[@"icon"] title:config[@"title"]];
-        item.tag = i;
-        __weak typeof(self) weakSelf = self;
-        item.tapHandler = ^{
-            [HapticManager.shared play:HapticTypeLight];
-            [weakSelf selectItemAtIndex:i];
-        };
-        [self.stackContainer addSubview:item];
-        [itemArray addObject:item];
-
-        [NSLayoutConstraint activateConstraints:@[
-            [item.leadingAnchor constraintEqualToAnchor:self.stackContainer.leadingAnchor],
-            [item.trailingAnchor constraintEqualToAnchor:self.stackContainer.trailingAnchor],
-            [item.heightAnchor constraintEqualToAnchor:self.stackContainer.heightAnchor multiplier:1.0/tabConfig.count],
-        ]];
-
-        if (prevItem) {
-            [item.topAnchor constraintEqualToAnchor:prevItem.bottomAnchor].active = YES;
-        } else {
-            [item.topAnchor constraintEqualToAnchor:self.stackContainer.topAnchor].active = YES;
-        }
-        prevItem = item;
+    NSMutableArray *appearanceItems = [_sections.lastObject[@"items"] mutableCopy];
+    if (@available(iOS 16, *)) {
+        [appearanceItems insertObject:@{@"type": @"switch", @"label": @"Liquid Glass", @"key": @"general.liquid_glass"} atIndex:0];
     }
-    [prevItem.bottomAnchor constraintEqualToAnchor:self.stackContainer.bottomAnchor].active = YES;
+    NSMutableDictionary *appearanceSection = [_sections.lastObject mutableCopy];
+    appearanceSection[@"items"] = appearanceItems;
+    NSMutableArray *mutableSections = [_sections mutableCopy];
+    mutableSections[mutableSections.count - 1] = appearanceSection;
+    _sections = mutableSections;
+}
+
+- (NSArray *)getRendererOptions {
+    NSArray *renderers = getRendererKeys(YES);
+    NSArray *names = getRendererNames(YES);
+    NSMutableArray *options = [NSMutableArray array];
+    for (NSUInteger i = 0; i < renderers.count && i < names.count; i++) {
+        [options addObject:@{
+            @"key": renderers[i],
+            @"name": names[i]
+        }];
+    }
+    if (options.count == 0) {
+        options = [@[@{@"key": @"auto", @"name": @"Auto"}] mutableCopy];
+    }
+    return options;
+}
+
+- (void)setup {
+    self.view.clipsToBounds = YES;
+    self.navigationItem.title = localize(@"Settings", nil);
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(dismissSettings)];
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:localize(@"preference.title.reset_settings", nil) style:UIBarButtonItemStylePlain target:self action:@selector(resetSettings)];
+
+    UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
+    layout.minimumInteritemSpacing = 8;
+    layout.minimumLineSpacing = 8;
+    layout.sectionInset = UIEdgeInsetsMake(12, 12, 12, 12);
+
+    _tabGridView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:layout];
+    _tabGridView.translatesAutoresizingMaskIntoConstraints = NO;
+    _tabGridView.backgroundColor = [UIColor clearColor];
+    _tabGridView.delegate = self;
+    _tabGridView.dataSource = self;
+    _tabGridView.scrollEnabled = NO;
+    [_tabGridView registerClass:SettingsTabCell.class forCellWithReuseIdentifier:@"SettingsTabCell"];
+    [self.view addSubview:_tabGridView];
+
+    _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
+    _tableView.translatesAutoresizingMaskIntoConstraints = NO;
+    _tableView.delegate = self;
+    _tableView.dataSource = self;
+    _tableView.backgroundColor = [UIColor clearColor];
+    _tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
+    [self.view addSubview:_tableView];
+
+    _tabGridHeightConstraint = [_tabGridView.heightAnchor constraintEqualToConstant:240];
+    _tabGridHeightConstraint.active = YES;
 
     [NSLayoutConstraint activateConstraints:@[
-        [self.stackContainer.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.stackContainer.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
-        [self.stackContainer.widthAnchor constraintEqualToAnchor:self.view.widthAnchor],
-        [self.stackContainer.heightAnchor constraintEqualToAnchor:self.view.heightAnchor multiplier:0.85],
+        [_tabGridView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [_tabGridView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [_tabGridView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+
+        [_tableView.topAnchor constraintEqualToAnchor:_tabGridView.bottomAnchor constant:4],
+        [_tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [_tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [_tableView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
     ]];
+}
 
-    self.items = itemArray;
-    self.selectedTab = SidebarTabGame;
-
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(updateColors) name:ThemeDidChangeNotification object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(updateLiquidGlass) name:@"LiquidGlassDidChangeNotification" object:nil];
-    [self updateColors];
-    [self updateLiquidGlass];
+- (void)dismissSettings {
+    [self dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (void)updateColors {
     ThemeManager *theme = ThemeManager.shared;
-    self.view.backgroundColor = theme.sidebarBackgroundColor;
-    for (SidebarTabItem *item in self.items) {
-        item.iconView.tintColor = item.isSelected ? theme.accentColor : theme.secondaryTextColor;
-        item.titleLabel.textColor = item.isSelected ? theme.accentColor : theme.secondaryTextColor;
-        item.indicatorView.backgroundColor = theme.accentColor;
-    }
+    self.view.backgroundColor = theme.contentBackgroundColor;
+    _tableView.backgroundColor = theme.contentBackgroundColor;
+    _tabGridView.backgroundColor = [UIColor clearColor];
+    [_tabGridView reloadData];
+    [_tableView reloadData];
 }
 
-- (void)selectItemAtIndex:(NSInteger)index {
-    if (index == self.selectedTab) return;
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
 
-    for (SidebarTabItem *item in self.items) {
-        item.isSelected = NO;
-    }
-    self.items[index].isSelected = YES;
-    self.selectedTab = index;
-    [self updateColors];
+    CGFloat width = self.view.bounds.size.width;
+    if (width <= 0) return;
 
-    if (self.delegate) {
-        [self.delegate sidebarDidSelectTab:index];
+    UICollectionViewFlowLayout *layout = (UICollectionViewFlowLayout *)_tabGridView.collectionViewLayout;
+    CGFloat inset = layout.sectionInset.left + layout.sectionInset.right;
+    CGFloat spacing = layout.minimumInteritemSpacing;
+    BOOL isLandscape = self.view.bounds.size.width > self.view.bounds.size.height;
+    BOOL isPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad);
+    NSInteger columns = 2;
+    if (isPad) {
+        columns = 5;
+    } else if (isLandscape) {
+        columns = 5;
     }
+    columns = MAX(columns, 2);
+
+    CGFloat itemWidth = floor((width - inset - (spacing * (columns - 1))) / (CGFloat)columns);
+    CGFloat minItemWidth = isPad ? 104.0 : (isLandscape ? 92.0 : 120.0);
+    itemWidth = MAX(itemWidth, minItemWidth);
+    layout.itemSize = CGSizeMake(itemWidth, itemWidth);
+
+    NSInteger count = _sections.count;
+    NSInteger rows = (count + columns - 1) / columns;
+    CGFloat height = layout.sectionInset.top + layout.sectionInset.bottom + rows * itemWidth + MAX(rows - 1, 0) * layout.minimumLineSpacing;
+    _tabGridHeightConstraint.constant = height;
 }
 
-- (void)setSelectedTab:(SidebarTab)tab {
-    _selectedTab = tab;
-    for (SidebarTabItem *item in self.items) {
-        item.isSelected = NO;
+#pragma mark - Tab Grid
+
+- (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
+    return _sections.count;
+}
+
+- (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
+    SettingsTabCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"SettingsTabCell" forIndexPath:indexPath];
+    NSDictionary *section = _sections[indexPath.item];
+    NSString *title = section[@"title"] ?: @"";
+    NSString *iconName = section[@"icon"] ?: @"gearshape.fill";
+    cell.titleLabel.text = title;
+    UIImage *icon = [[UIImage systemImageNamed:iconName] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    if (!icon) {
+        icon = [UIImage systemImageNamed:@"gearshape.fill"];
     }
-    self.items[tab].isSelected = YES;
-    [self updateColors];
+    cell.iconView.image = icon;
+
+    ThemeManager *theme = ThemeManager.shared;
+    BOOL selected = (indexPath.item == _selectedSectionIndex);
+    cell.contentView.backgroundColor = selected ? [theme.accentColor colorWithAlphaComponent:0.16] : theme.cardBackgroundColor;
+    cell.contentView.layer.borderColor = (selected ? theme.accentColor : theme.separatorColor).CGColor;
+    cell.iconView.tintColor = selected ? theme.accentColor : theme.secondaryTextColor;
+    cell.titleLabel.textColor = selected ? theme.accentColor : theme.primaryTextColor;
+    return cell;
 }
 
-- (void)setSelectedTab:(SidebarTab)tab animated:(BOOL)animated {
-    [self selectItemAtIndex:tab];
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    if (_selectedSectionIndex == indexPath.item) return;
+    [HapticManager.shared play:HapticTypeLight];
+    _selectedSectionIndex = indexPath.item;
+    [_tabGridView reloadData];
+    [_tableView reloadData];
+    [_tableView setContentOffset:CGPointZero animated:NO];
 }
 
-- (void)updateTabAvailabilityForLoader:(NSString *)loader {
-    BOOL isVanilla = !loader || [loader isEqualToString:@"Vanilla"] || loader.length == 0;
-    for (NSUInteger i = 0; i < self.items.count; i++) {
-        SidebarTabItem *item = self.items[i];
-        if (i == SidebarTabMod || i == SidebarTabShader) {
-            item.alpha = isVanilla ? 0.35 : 1.0;
-            item.userInteractionEnabled = !isVanilla;
-        } else {
-            item.alpha = 1.0;
-            item.userInteractionEnabled = YES;
+#pragma mark - TableView
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return 1;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    return [_sections[_selectedSectionIndex][@"items"] count];
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    return 48;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][indexPath.row];
+    NSString *type = item[@"type"];
+    NSString *cellId = type;
+
+    NSInteger const kLabelTag = 100;
+    NSInteger const kValLabelTag = 101;
+    NSInteger const kSliderTag = 102;
+    NSInteger const kTextFieldTag = 103;
+    NSInteger const kColorWellTag = 104;
+
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
+    if (!cell) {
+        if ([type isEqualToString:@"switch"]) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellId];
+            cell.textLabel.font = [UIFont systemFontOfSize:15];
+            cell.backgroundColor = ThemeManager.shared.cardBackgroundColor;
+            cell.textLabel.textColor = ThemeManager.shared.primaryTextColor;
+            UISwitch *sw = [[UISwitch alloc] init];
+            sw.onTintColor = ThemeManager.shared.accentColor;
+            [sw addTarget:self action:@selector(switchChanged:) forControlEvents:UIControlEventValueChanged];
+            cell.accessoryView = sw;
+            cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        } else if ([type isEqualToString:@"slider"]) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellId];
+            cell.backgroundColor = ThemeManager.shared.cardBackgroundColor;
+            cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+            UILabel *label = [[UILabel alloc] init];
+            label.translatesAutoresizingMaskIntoConstraints = NO;
+            label.tag = kLabelTag;
+            label.font = [UIFont systemFontOfSize:15];
+            label.textColor = ThemeManager.shared.primaryTextColor;
+            label.numberOfLines = 1;
+            [cell.contentView addSubview:label];
+
+            UILabel *valLabel = [[UILabel alloc] init];
+            valLabel.translatesAutoresizingMaskIntoConstraints = NO;
+            valLabel.tag = kValLabelTag;
+            valLabel.font = [UIFont systemFontOfSize:13];
+            valLabel.textColor = ThemeManager.shared.secondaryTextColor;
+            valLabel.textAlignment = NSTextAlignmentRight;
+            [cell.contentView addSubview:valLabel];
+
+            UISlider *slider = [[UISlider alloc] init];
+            slider.translatesAutoresizingMaskIntoConstraints = NO;
+            slider.tag = kSliderTag;
+            slider.minimumValue = [item[@"min"] floatValue];
+            slider.maximumValue = [item[@"max"] floatValue];
+            slider.minimumTrackTintColor = ThemeManager.shared.accentColor;
+            slider.maximumTrackTintColor = ThemeManager.shared.separatorColor;
+            slider.thumbTintColor = ThemeManager.shared.accentColor;
+            [slider addTarget:self action:@selector(sliderChanged:) forControlEvents:UIControlEventValueChanged];
+            [cell.contentView addSubview:slider];
+
+            [NSLayoutConstraint activateConstraints:@[
+                [label.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
+                [label.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:6],
+
+                [valLabel.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+                [valLabel.centerYAnchor constraintEqualToAnchor:label.centerYAnchor],
+                [valLabel.leadingAnchor constraintGreaterThanOrEqualToAnchor:label.trailingAnchor constant:8],
+
+                [slider.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
+                [slider.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+                [slider.topAnchor constraintEqualToAnchor:label.bottomAnchor constant:0],
+                [slider.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-4],
+            ]];
+        } else if ([type isEqualToString:@"picker"]) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:cellId];
+            cell.textLabel.font = [UIFont systemFontOfSize:15];
+            cell.detailTextLabel.font = [UIFont systemFontOfSize:14];
+            cell.backgroundColor = ThemeManager.shared.cardBackgroundColor;
+            cell.textLabel.textColor = ThemeManager.shared.primaryTextColor;
+            cell.detailTextLabel.textColor = ThemeManager.shared.accentColor;
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else if ([type isEqualToString:@"text"]) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellId];
+            cell.backgroundColor = ThemeManager.shared.cardBackgroundColor;
+            cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+            UILabel *label = [[UILabel alloc] init];
+            label.translatesAutoresizingMaskIntoConstraints = NO;
+            label.tag = kLabelTag;
+            label.font = [UIFont systemFontOfSize:15];
+            label.textColor = ThemeManager.shared.primaryTextColor;
+            [cell.contentView addSubview:label];
+
+            UITextField *tf = [[UITextField alloc] init];
+            tf.translatesAutoresizingMaskIntoConstraints = NO;
+            tf.tag = kTextFieldTag;
+            tf.font = [UIFont systemFontOfSize:13];
+            tf.textColor = ThemeManager.shared.secondaryTextColor;
+            tf.textAlignment = NSTextAlignmentRight;
+            tf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+            tf.autocorrectionType = UITextAutocorrectionTypeNo;
+            [tf addTarget:self action:@selector(textFieldChanged:) forControlEvents:UIControlEventEditingChanged];
+            [cell.contentView addSubview:tf];
+
+            [NSLayoutConstraint activateConstraints:@[
+                [label.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
+                [label.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+                [label.trailingAnchor constraintLessThanOrEqualToAnchor:tf.leadingAnchor constant:-8],
+
+                [tf.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+                [tf.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+                [tf.widthAnchor constraintEqualToConstant:200],
+            ]];
+        } else if ([type isEqualToString:@"navigate"]) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellId];
+            cell.textLabel.font = [UIFont systemFontOfSize:15];
+            cell.backgroundColor = ThemeManager.shared.cardBackgroundColor;
+            cell.textLabel.textColor = ThemeManager.shared.primaryTextColor;
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else if ([type isEqualToString:@"color"]) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellId];
+            cell.textLabel.font = [UIFont systemFontOfSize:15];
+            cell.backgroundColor = ThemeManager.shared.cardBackgroundColor;
+            cell.textLabel.textColor = ThemeManager.shared.primaryTextColor;
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+
+            UIView *colorPreview = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 28, 28)];
+            colorPreview.tag = kColorWellTag;
+            colorPreview.layer.cornerRadius = 6;
+            colorPreview.layer.borderWidth = 1;
+            colorPreview.layer.borderColor = ThemeManager.shared.separatorColor.CGColor;
+            colorPreview.userInteractionEnabled = NO;
+            cell.accessoryView = colorPreview;
+        } else if ([type isEqualToString:@"image"]) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellId];
+            cell.textLabel.font = [UIFont systemFontOfSize:15];
+            cell.backgroundColor = ThemeManager.shared.cardBackgroundColor;
+            cell.textLabel.textColor = ThemeManager.shared.primaryTextColor;
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         }
     }
+
+    cell.textLabel.text = nil;
+    cell.detailTextLabel.text = nil;
+    if ([type isEqualToString:@"switch"] || [type isEqualToString:@"picker"] || [type isEqualToString:@"navigate"] || [type isEqualToString:@"color"] || [type isEqualToString:@"image"]) {
+        cell.textLabel.text = item[@"label"];
+    }
+
+    if ([type isEqualToString:@"picker"]) {
+        id value = getPrefObject(item[@"key"]) ?: item[@"default"];
+        if ([value isKindOfClass:[NSString class]]) {
+            cell.detailTextLabel.text = value;
+        } else {
+            cell.detailTextLabel.text = [value description];
+        }
+    } else if ([type isEqualToString:@"switch"]) {
+        UISwitch *sw = (UISwitch *)cell.accessoryView;
+        sw.on = getPrefBool(item[@"key"]);
+    } else if ([type isEqualToString:@"slider"]) {
+        UILabel *label = (UILabel *)[cell.contentView viewWithTag:kLabelTag];
+        UILabel *valLabel = (UILabel *)[cell.contentView viewWithTag:kValLabelTag];
+        UISlider *sl = (UISlider *)[cell.contentView viewWithTag:kSliderTag];
+        label.text = item[@"label"];
+        float val;
+        BOOL disabled = NO;
+        if ([item[@"key"] isEqualToString:@"java.allocated_memory"] && getPrefBool(@"java.auto_ram")) {
+            CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.4 : 0.25;
+            val = roundf((NSProcessInfo.processInfo.physicalMemory / 1048576) * autoRatio);
+            disabled = YES;
+        } else if ([item[@"key"] isEqualToString:@"amethyst_bg_blur"]) {
+            val = ThemeManager.shared.backgroundBlurIntensity;
+        } else if ([item[@"key"] isEqualToString:@"amethyst_ui_opacity"]) {
+            val = ThemeManager.shared.uiOpacity * 100.0;
+        } else {
+            val = getPrefFloat(item[@"key"]);
+            if ([item[@"key"] isEqualToString:@"java.allocated_memory"] && val < [item[@"min"] floatValue]) {
+                CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.4 : 0.25;
+                val = roundf((NSProcessInfo.processInfo.physicalMemory / 1048576) * autoRatio);
+                setPrefFloat(@"java.allocated_memory", val);
+            }
+        }
+        if (val == 0 && ![item[@"key"] isEqualToString:@"amethyst_bg_blur"] && ![item[@"key"] isEqualToString:@"amethyst_ui_opacity"] && !disabled) val = [item[@"min"] floatValue] + ([item[@"max"] floatValue] - [item[@"min"] floatValue]) / 2;
+        sl.minimumValue = [item[@"min"] floatValue];
+        sl.maximumValue = [item[@"max"] floatValue];
+        sl.value = val;
+        sl.enabled = !disabled;
+        sl.thumbTintColor = disabled ? ThemeManager.shared.separatorColor : ThemeManager.shared.accentColor;
+        valLabel.text = [NSString stringWithFormat:@"%.0f%@", sl.value, item[@"suffix"] ?: @""];
+    } else if ([type isEqualToString:@"text"]) {
+        UILabel *label = (UILabel *)[cell.contentView viewWithTag:kLabelTag];
+        UITextField *tf = (UITextField *)[cell.contentView viewWithTag:kTextFieldTag];
+        label.text = item[@"label"];
+        tf.placeholder = item[@"placeholder"] ?: @"";
+        tf.text = [getPrefObject(item[@"key"]) description];
+    } else if ([type isEqualToString:@"color"]) {
+        UIView *preview = [cell.contentView viewWithTag:kColorWellTag] ?: cell.accessoryView;
+        if ([preview isKindOfClass:[UIView class]]) {
+            UIColor *color = [self colorForKey:item[@"key"]];
+            preview.backgroundColor = color;
+            preview.layer.borderColor = ThemeManager.shared.separatorColor.CGColor;
+        }
+    }
+
+    return cell;
 }
 
-- (void)updateLiquidGlass {
-    if (getPrefBool(@"general.liquid_glass")) {
-        [self.view lg_addGlassEffectWithTint:[UIColor colorWithWhite:1 alpha:0.05] cornerRadius:0];
-    } else {
-        [self.view lg_removeGlassEffect];
+- (UIColor *)colorForKey:(NSString *)key {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *hex = [defaults stringForKey:key];
+    if (hex) {
+        hex = [hex stringByReplacingOccurrencesOfString:@"#" withString:@""];
+        if (hex.length == 6) {
+            unsigned int rgb = 0;
+            [[NSScanner scannerWithString:hex] scanHexInt:&rgb];
+            return [UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0
+                                   green:((rgb >> 8) & 0xFF) / 255.0
+                                    blue:(rgb & 0xFF) / 255.0
+                                   alpha:1.0];
+        }
     }
+    if ([key isEqualToString:@"amethyst_accent_color"]) {
+        return ThemeManager.shared.accentColor;
+    }
+    return [UIColor clearColor];
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][indexPath.row];
+    NSString *type = item[@"type"];
+
+    if ([type isEqualToString:@"picker"]) {
+        [self showPickerForItem:item];
+    } else if ([type isEqualToString:@"navigate"]) {
+        [self navigateToVC:item[@"vc"] title:item[@"label"]];
+    } else if ([type isEqualToString:@"color"]) {
+        if ([item[@"key"] isEqualToString:@"amethyst_reset_appearance"]) {
+            [self resetAppearance];
+        } else {
+            [self showColorPickerForKey:item[@"key"] label:item[@"label"]];
+        }
+    } else if ([type isEqualToString:@"image"]) {
+        [self showImagePicker];
+    }
+}
+
+#pragma mark - Actions
+
+- (void)switchChanged:(UISwitch *)sender {
+    UITableViewCell *cell = (UITableViewCell *)sender.superview;
+    if (![cell isKindOfClass:[UITableViewCell class]]) {
+        cell = (UITableViewCell *)sender.superview.superview;
+    }
+    NSIndexPath *ip = [_tableView indexPathForCell:cell];
+    if (!ip) return;
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][ip.row];
+    setPrefBool(item[@"key"], sender.on);
+    if ([item[@"key"] isEqualToString:@"java.auto_ram"]) {
+        if (!sender.on) {
+            CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.4 : 0.25;
+            float autoVal = roundf((NSProcessInfo.processInfo.physicalMemory / 1048576) * autoRatio);
+            setPrefFloat(@"java.allocated_memory", autoVal);
+        }
+        [self.tableView reloadData];
+    } else if ([item[@"key"] isEqualToString:@"general.liquid_glass"]) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"LiquidGlassDidChangeNotification" object:nil];
+    } else if ([item[@"key"] isEqualToString:@"general.lock_landscape"]) {
+        [UIViewController attemptRotationToDeviceOrientation];
+        if (@available(iOS 16.0, *)) {
+            UIInterfaceOrientationMask mask = sender.on ? UIInterfaceOrientationMaskLandscape : UIInterfaceOrientationMaskAll;
+            for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+                if ([scene isKindOfClass:UIWindowScene.class]) {
+                    UIWindowSceneGeometryPreferencesIOS *prefs = [[UIWindowSceneGeometryPreferencesIOS alloc] initWithInterfaceOrientations:mask];
+                    [(UIWindowScene *)scene requestGeometryUpdateWithPreferences:prefs errorHandler:^(NSError *error) {
+                        NSLog(@"[LockLandscape] requestGeometryUpdate error: %@", error);
+                    }];
+                }
+            }
+        }
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"OrientationLockDidChange" object:nil];
+    }
+}
+
+- (void)sliderChanged:(UISlider *)sender {
+    UITableViewCell *cell = (UITableViewCell *)sender.superview.superview;
+    NSIndexPath *ip = [_tableView indexPathForCell:cell];
+    if (!ip) return;
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][ip.row];
+    float val = roundf(sender.value);
+    if ([item[@"key"] isEqualToString:@"amethyst_bg_blur"]) {
+        ThemeManager.shared.backgroundBlurIntensity = val;
+    } else if ([item[@"key"] isEqualToString:@"amethyst_ui_opacity"]) {
+        ThemeManager.shared.uiOpacity = val / 100.0;
+    } else {
+        setPrefFloat(item[@"key"], val);
+        if ([item[@"key"] isEqualToString:@"video.resolution"]) {
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"ResolutionDidChangeNotification" object:nil];
+        }
+    }
+    UILabel *valLabel = (UILabel *)[cell.contentView viewWithTag:101];
+    valLabel.text = [NSString stringWithFormat:@"%.0f%@", val, item[@"suffix"] ?: @""];
+}
+
+- (void)textFieldChanged:(UITextField *)sender {
+    UITableViewCell *cell = (UITableViewCell *)sender.superview.superview;
+    NSIndexPath *ip = [_tableView indexPathForCell:cell];
+    if (!ip) return;
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][ip.row];
+    NSString *key = item[@"key"];
+    NSString *value = sender.text ?: @"";
+    setPrefObject(key, value);
+    if ([key isEqualToString:kCurseForgeAPIKeyPrefKey]) {
+        [CurseForgeService.shared setAPIKey:value];
+    }
+}
+
+- (void)showPickerForItem:(NSDictionary *)item {
+    NSArray *options = item[@"options"];
+    if (![options isKindOfClass:[NSArray class]] || options.count == 0) {
+        showDialog(@"No Options", @"No options available for this setting.");
+        return;
+    }
+    id currentValueObj = getPrefObject(item[@"key"]) ?: item[@"default"];
+    NSString *currentValue = [currentValueObj isKindOfClass:[NSString class]] ? currentValueObj : [currentValueObj description];
+
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:item[@"label"] message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+
+    if ([item[@"key"] isEqualToString:@"video.renderer"] && [options.firstObject isKindOfClass:[NSDictionary class]]) {
+        for (NSDictionary *opt in options) {
+            NSString *key = opt[@"key"];
+            NSString *name = opt[@"name"];
+            BOOL isSelected = [currentValue isEqualToString:key];
+            NSString *label = isSelected ? [NSString stringWithFormat:@"✓ %@", name] : name;
+            [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+                setPrefObject(item[@"key"], key);
+                [_tableView reloadData];
+            }]];
+        }
+    } else {
+        for (NSString *opt in options) {
+            if (![opt isKindOfClass:[NSString class]]) continue;
+            NSString *display = opt;
+            NSString *cap = [opt stringByReplacingCharactersInRange:NSMakeRange(0,1) withString:[[opt substringToIndex:1] capitalizedString]];
+            display = cap;
+            BOOL isSelected = [currentValue isEqualToString:opt];
+            NSString *label = isSelected ? [NSString stringWithFormat:@"✓ %@", display] : display;
+            [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+                setPrefObject(item[@"key"], opt);
+                if ([item[@"key"] isEqualToString:@"launcher.theme"]) {
+                    [self handleThemeChange:opt];
+                }
+                [_tableView reloadData];
+            }]];
+        }
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        sheet.popoverPresentationController.sourceView = self.tableView;
+        sheet.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(self.tableView.bounds), CGRectGetMidY(self.tableView.bounds), 0, 0);
+    }
+
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)handleThemeChange:(NSString *)themeValue {
+    UIUserInterfaceStyle style = UIUserInterfaceStyleUnspecified;
+    if ([themeValue isEqualToString:@"Dark"]) {
+        style = UIUserInterfaceStyleDark;
+    } else if ([themeValue isEqualToString:@"Light"]) {
+        style = UIUserInterfaceStyleLight;
+    }
+    [ThemeManager.shared applyInterfaceStyle:style];
+    [ThemeManager.shared applyThemeToAllWindows];
+    [self.tableView reloadData];
+}
+
+- (void)showColorPickerForKey:(NSString *)key label:(NSString *)label {
+    UIColorPickerViewController *picker = [[UIColorPickerViewController alloc] init];
+    picker.delegate = self;
+    picker.title = label;
+    picker.supportsAlpha = NO;
+
+    UIColor *current = [self colorForKey:key];
+    if (CGColorGetAlpha(current.CGColor) > 0) {
+        picker.selectedColor = current;
+    }
+
+    self.pendingColorPickCallback = ^(UIColor *color) {
+        if ([key isEqualToString:@"amethyst_accent_color"]) {
+            [ThemeManager.shared applyAccentColor:color];
+        } else {
+            [ThemeManager.shared applyColor:color forKey:key];
+        }
+        [self.tableView reloadData];
+    };
+
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)colorPickerViewControllerDidSelectColor:(UIColorPickerViewController *)picker {
+    if (self.pendingColorPickCallback) {
+        self.pendingColorPickCallback(picker.selectedColor);
+        self.pendingColorPickCallback = nil;
+    }
+}
+
+- (void)colorPickerViewControllerDidFinish:(UIColorPickerViewController *)picker {
+    if (self.pendingColorPickCallback) {
+        self.pendingColorPickCallback(picker.selectedColor);
+        self.pendingColorPickCallback = nil;
+    }
+}
+
+- (void)showImagePicker {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:localize(@"Background", nil) message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:localize(@"Choose Image from Library", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [self openPhotoLibraryWithFilter:[PHPickerFilter imagesFilter]];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:localize(@"Choose Video from Library", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [self openPhotoLibraryWithFilter:[PHPickerFilter videosFilter]];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:localize(@"Remove Background", nil) style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+        [self removeBackgroundImage];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)openPhotoLibraryWithFilter:(PHPickerFilter *)filter {
+    if (@available(iOS 14, *)) {
+        PHPickerConfiguration *config = [[PHPickerConfiguration alloc] init];
+        config.filter = filter;
+        config.selectionLimit = 1;
+        PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:config];
+        picker.delegate = self;
+        [self presentViewController:picker animated:YES completion:nil];
+    } else {
+        UIImagePickerController *picker = [[UIImagePickerController alloc] init];
+        picker.delegate = self;
+        picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+        picker.allowsEditing = NO;
+        [self presentViewController:picker animated:YES completion:nil];
+    }
+}
+
+- (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results {
+    [picker dismissViewControllerAnimated:YES completion:nil];
+    if (results.count == 0) return;
+
+    PHPickerResult *result = results.firstObject;
+    NSItemProvider *provider = result.itemProvider;
+    if ([provider hasItemConformingToTypeIdentifier:UTTypeMovie.identifier]) {
+        [provider loadFileRepresentationForTypeIdentifier:UTTypeMovie.identifier completionHandler:^(NSURL *url, NSError *error) {
+            if (error || !url) return;
+            NSString *destPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject stringByAppendingPathComponent:@"amethyst_bg.mp4"];
+            NSFileManager *fm = [NSFileManager defaultManager];
+            [fm removeItemAtPath:destPath error:nil];
+            BOOL access = [url startAccessingSecurityScopedResource];
+            NSError *copyError = nil;
+            BOOL ok = [fm copyItemAtURL:url toURL:[NSURL fileURLWithPath:destPath] error:&copyError];
+            if (!ok) {
+                NSData *data = [NSData dataWithContentsOfURL:url options:0 error:&copyError];
+                if (data) {
+                    ok = [data writeToFile:destPath atomically:YES];
+                }
+            }
+            if (access) [url stopAccessingSecurityScopedResource];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (!ok) {
+                    NSLog(@"[saveBackgroundVideo] copy failed in provider handler: %@ (source: %@)", copyError, url);
+                    showDialog(localize(@"Error", nil), localize(@"Could not copy the video. Please try another file.", nil));
+                    return;
+                }
+                ThemeManager.shared.backgroundVideoURL = [NSURL fileURLWithPath:destPath];
+                [ThemeManager.shared broadcastThemeChange];
+            });
+        }];
+    } else {
+        [provider loadObjectOfClass:[UIImage class] completionHandler:^(id<NSItemProviderReading> object, NSError *error) {
+            if (error || !object) return;
+            UIImage *image = (UIImage *)object;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self saveBackgroundImage:image];
+            });
+        }];
+    }
+}
+
+- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
+    [picker dismissViewControllerAnimated:YES completion:nil];
+    if (picker.mediaTypes.count > 1 || [picker.mediaTypes.firstObject isEqualToString:UTTypeMovie.identifier]) {
+        NSURL *videoURL = info[UIImagePickerControllerMediaURL];
+        if (videoURL) {
+            [self saveBackgroundVideo:videoURL];
+            return;
+        }
+    }
+    UIImage *image = info[UIImagePickerControllerOriginalImage];
+    if (image) {
+        [self saveBackgroundImage:image];
+    }
+}
+
+- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+    [picker dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)saveBackgroundImage:(UIImage *)image {
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *docsPath = paths.firstObject;
+    NSString *imgPath = [docsPath stringByAppendingPathComponent:@"amethyst_bg.png"];
+    [UIImagePNGRepresentation(image) writeToFile:imgPath atomically:YES];
+
+    ThemeManager.shared.backgroundImage = image;
+    [[NSUserDefaults standardUserDefaults] setObject:imgPath forKey:@"amethyst_bg_image"];
+    [ThemeManager.shared broadcastThemeChange];
+}
+
+- (void)saveBackgroundVideo:(NSURL *)videoURL {
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *docsPath = paths.firstObject;
+    NSString *destPath = [docsPath stringByAppendingPathComponent:@"amethyst_bg.mp4"];
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    [fm removeItemAtPath:destPath error:nil];
+
+    BOOL access = [videoURL startAccessingSecurityScopedResource];
+    NSError *error = nil;
+    BOOL ok = [fm copyItemAtURL:videoURL toURL:[NSURL fileURLWithPath:destPath] error:&error];
+    if (!ok) {
+        NSLog(@"[saveBackgroundVideo] copyItemAtURL failed: %@ (source: %@)", error, videoURL);
+        NSData *data = [NSData dataWithContentsOfURL:videoURL options:0 error:&error];
+        if (data) {
+            ok = [data writeToFile:destPath atomically:YES];
+        }
+        if (!ok) NSLog(@"[saveBackgroundVideo] data fallback failed: %@", error);
+    }
+    if (access) [videoURL stopAccessingSecurityScopedResource];
+
+    if (!ok) {
+        showDialog(localize(@"Error", nil), localize(@"Could not copy the video. Please try another file.", nil));
+        return;
+    }
+    ThemeManager.shared.backgroundVideoURL = [NSURL fileURLWithPath:destPath];
+    [ThemeManager.shared broadcastThemeChange];
+}
+
+- (void)removeBackgroundImage {
+    ThemeManager.shared.backgroundImage = nil;
+    ThemeManager.shared.backgroundVideoURL = nil;
+
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *imgPath = [paths.firstObject stringByAppendingPathComponent:@"amethyst_bg.png"];
+    [[NSFileManager defaultManager] removeItemAtPath:imgPath error:nil];
+    NSString *videoPath = [paths.firstObject stringByAppendingPathComponent:@"amethyst_bg.mp4"];
+    [[NSFileManager defaultManager] removeItemAtPath:videoPath error:nil];
+
+    [ThemeManager.shared broadcastThemeChange];
+}
+
+- (void)resetAppearance {
+    [ThemeManager.shared resetAppearance];
+    [self.tableView reloadData];
+}
+
+- (void)navigateToVC:(NSString *)vcName title:(NSString *)title {
+    Class vcClass = NSClassFromString(vcName);
+    if (!vcClass) {
+        showDialog(localize(@"Not Available", nil), [NSString stringWithFormat:localize(@"%@ is not available in this build.", nil), title]);
+        return;
+    }
+    UIViewController *vc = [[vcClass alloc] init];
+    if (vc) {
+        vc.title = title;
+
+        if ([vc isKindOfClass:[CustomControlsViewController class]]) {
+            CustomControlsViewController *ccvc = (CustomControlsViewController *)vc;
+            ccvc.modalPresentationStyle = UIModalPresentationOverFullScreen;
+            ccvc.setDefaultCtrl = ^(NSString *name){
+                setPrefObject(@"control.default_ctrl", name);
+            };
+            ccvc.getDefaultCtrl = ^{
+                return getPrefObject(@"control.default_ctrl");
+            };
+            [self presentViewController:ccvc animated:YES completion:nil];
+            return;
+        }
+
+        if (self.navigationController) {
+            [self.navigationController pushViewController:vc animated:YES];
+        } else {
+            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+            nav.modalPresentationStyle = UIModalPresentationFormSheet;
+            [self presentViewController:nav animated:YES completion:nil];
+        }
+    } else {
+        showDialog(localize(@"Error", nil), [NSString stringWithFormat:localize(@"Failed to create %@.", nil), title]);
+    }
+}
+
+- (void)resetSettings {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"Reset Settings", nil) message:localize(@"Are you sure you want to reset all settings to default?", nil) preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"Reset", nil) style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+        loadPreferences(YES);
+        loadPreferences(NO);
+        [ThemeManager.shared applyInterfaceStyle:UIUserInterfaceStyleUnspecified];
+        [ThemeManager.shared applyThemeToAllWindows];
+        [self resetAppearance];
+        [self buildSections];
+        [self.tableView reloadData];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)dealloc {
