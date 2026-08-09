@@ -74,8 +74,7 @@ jobs:
           export PATH="$JDK_BASE_PATH/bin:/opt/homebrew/bin:$PATH"
           export JAVA_HOME="$JDK_BASE_PATH"
           export BOOTJDK="$JDK_BASE_PATH/bin"
-          export SLIMMED=1
-          
+
           export CODE_SIGNING_ALLOWED=NO
           export CODE_SIGNING_REQUIRED=NO
           export CODE_SIGN_IDENTITY=""
@@ -87,12 +86,8 @@ jobs:
 
           # WARNING MITIGATION: Filter runtime stderr streams to suppress repetitive upstream vtool signature warnings
           gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=2 $SIGN_FLAGS 2> >(grep -v "vtool warning: code signature will be invalid" >&2)
-          
-          gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=2 TROLLSTORE_JIT_ENT=1 $SIGN_FLAGS 2> >(grep -v "vtool warning: code signature will be invalid" >&2)
 
-      - name: List artifacts
-        if: always()
-        run: ls -la artifacts/ || true
+          gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=2 TROLLSTORE_JIT_ENT=1 $SIGN_FLAGS 2> >(grep -v "vtool warning: code signature will be invalid" >&2)
 
       - name: Upload TrollStore tIPA (full)
         if: always()
@@ -100,16 +95,6 @@ jobs:
         with:
           name: org.angelauramc.amethyst-ios-trollstore
           path: artifacts/org.angelauramc.amethyst-*-ios-trollstore.tipa
-          retention-days: 30
-          if-no-files-found: warn
-          compression-level: 0
-
-      - name: Upload TrollStore tIPA (slimmed)
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: org.angelauramc.amethyst-ios-trollstore-slimmed
-          path: artifacts/org.angelauramc.amethyst.slimmed-*-ios-trollstore.tipa
           retention-days: 30
           if-no-files-found: warn
           compression-level: 0
@@ -123,34 +108,3 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
           compression-level: 0
-
-      - name: Upload regular IPA (slimmed)
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: org.angelauramc.amethyst-ios-slimmed
-          path: artifacts/org.angelauramc.amethyst.slimmed-*-ios.ipa
-          retention-days: 30
-          if-no-files-found: warn
-          compression-level: 0
-
-      - name: Upload AngelAuraAmethyst.dSYM
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: AngelAuraAmethyst.dSYM
-          path: artifacts/AngelAuraAmethyst.dSYM
-          retention-days: 14
-          if-no-files-found: warn
-          compression-level: 0
-
-      # extract local compilation cmake diagnostic records upon unexpected pipeline failure
-      - name: Upload build logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v5
-        with:
-          name: build-logs
-          path: |
-            Natives/build/CMakeFiles/CMakeOutput.log
-            Natives/build/CMakeFiles/CMakeError.log
-          if-no-files-found: ignore
