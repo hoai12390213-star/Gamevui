@@ -75,24 +75,32 @@
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
 
-    CGFloat topBarHeight = 44.0;
-    CGFloat sidebarWidth = 48.0;
-    CGFloat rightPanelWidth = 180.0;
-
     CGRect bounds = self.view.bounds;
     if (bounds.size.width == 0 || bounds.size.height == 0) return;
 
     UIEdgeInsets safeArea = self.view.safeAreaInsets;
+    BOOL isLandscape = bounds.size.width > bounds.size.height;
+
+    CGFloat topBarHeight = isLandscape ? 44.0 : 48.0;
+    CGFloat sidebarWidth = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad ? 60.0 : (isLandscape ? 48.0 : 56.0);
+    CGFloat rightPanelWidth = isLandscape ? 180.0 : bounds.size.width - safeArea.left - safeArea.right;
+    CGFloat rightPanelHeight = isLandscape ? bounds.size.height - safeArea.top - topBarHeight - safeArea.bottom : 0.0;
+
+    if (!isLandscape) {
+        CGFloat maxPortraitPanel = MIN(280.0, MAX(220.0, bounds.size.height * 0.30));
+        rightPanelHeight = MIN(maxPortraitPanel, MAX(200.0, bounds.size.height * 0.28));
+    }
 
     CGFloat topBarY = safeArea.top;
-
-    BOOL isLandscape = bounds.size.width > bounds.size.height;
     CGFloat leftInset = isLandscape ? safeArea.left : 0;
     CGFloat rightInset = isLandscape ? safeArea.right : 0;
 
     CGFloat contentTop = topBarY + topBarHeight;
-    CGFloat contentHeight = bounds.size.height - contentTop - safeArea.bottom;
-    CGFloat contentWidth = bounds.size.width - leftInset - sidebarWidth - 1 - rightPanelWidth - rightInset;
+    CGFloat contentBottom = isLandscape ? safeArea.bottom : (safeArea.bottom + rightPanelHeight);
+    CGFloat contentHeight = bounds.size.height - contentTop - contentBottom - (isLandscape ? 0 : 8);
+    CGFloat contentWidth = isLandscape
+        ? bounds.size.width - leftInset - sidebarWidth - 1 - rightPanelWidth - rightInset
+        : bounds.size.width - leftInset - sidebarWidth - rightInset;
 
     _topBar.frame = CGRectMake(leftInset, topBarY, bounds.size.width - leftInset - rightInset, topBarHeight);
 
@@ -104,10 +112,15 @@
     _sidebarVC.view.frame = CGRectMake(sidebarX, contentTop, sidebarWidth, contentHeight);
     _sidebarBorder.frame = CGRectMake(sidebarX + sidebarWidth, contentTop, 1, contentHeight);
 
-    CGFloat rightX = bounds.size.width - rightPanelWidth - rightInset;
-    _rightPanelVC.view.frame = CGRectMake(rightX, contentTop, rightPanelWidth, contentHeight);
-
-    _contentContainer.frame = CGRectMake(sidebarX + sidebarWidth + 1, contentTop, contentWidth, contentHeight);
+    if (isLandscape) {
+        CGFloat rightX = bounds.size.width - rightPanelWidth - rightInset;
+        _rightPanelVC.view.frame = CGRectMake(rightX, contentTop, rightPanelWidth, contentHeight);
+        _contentContainer.frame = CGRectMake(sidebarX + sidebarWidth + 1, contentTop, contentWidth, contentHeight);
+    } else {
+        CGFloat panelY = bounds.size.height - safeArea.bottom - rightPanelHeight;
+        _rightPanelVC.view.frame = CGRectMake(leftInset, panelY, bounds.size.width - leftInset - rightInset, rightPanelHeight);
+        _contentContainer.frame = CGRectMake(sidebarX + sidebarWidth + 1, contentTop, contentWidth, MAX(contentHeight, 0));
+    }
 
     if (self.currentContentVC) {
         self.currentContentVC.view.frame = _contentContainer.bounds;
