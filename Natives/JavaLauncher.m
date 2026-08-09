@@ -396,6 +396,10 @@ int launchJVMWithArgs(NSString *username, id launchTarget, int width, int height
         javaLibraryPath = [NSString stringWithFormat:@"%@:%@",
             [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"libs/lwjgl36_natives"],
             javaLibraryPath];
+    } else if ([lwjglVersion isEqualToString:@"3.3.1"]) {
+        javaLibraryPath = [NSString stringWithFormat:@"%@:%@",
+            [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"libs/lwjgl31_natives"],
+            javaLibraryPath];
     } else {
         javaLibraryPath = [NSString stringWithFormat:@"%@:%@",
             [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"libs/lwjgl33_natives"],
@@ -603,6 +607,9 @@ int launchJVMWithArgs(NSString *username, id launchTarget, int width, int height
         lwjglJarPath = [lwjglDirPath stringByAppendingPathComponent:@"lwjgl.jar"];
     } else if ([lwjglVersion isEqualToString:@"3.3.6"]) {
         lwjglDirPath = [librariesPath stringByAppendingPathComponent:@"lwjgl36"];
+        lwjglJarPath = [lwjglDirPath stringByAppendingPathComponent:@"lwjgl.jar"];
+    } else if ([lwjglVersion isEqualToString:@"3.3.1"]) {
+        lwjglDirPath = [librariesPath stringByAppendingPathComponent:@"lwjgl31"];
         lwjglJarPath = [lwjglDirPath stringByAppendingPathComponent:@"lwjgl.jar"];
     } else {
         lwjglDirPath = [librariesPath stringByAppendingPathComponent:@"lwjgl33"];
