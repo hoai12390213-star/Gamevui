@@ -12,7 +12,7 @@ jobs:
   build:
     name: Development build
     runs-on: macos-14
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -35,8 +35,6 @@ jobs:
         env:
           HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
         run: |
-          brew untap aws/tap 2>/dev/null || true
-          brew update
           brew install make wget ldid
           sudo mkdir -p /usr/local/bin
           # map the gmake binary symlink seamlessly across the target build runner paths
@@ -68,8 +66,6 @@ jobs:
       - name: Build sideload IPA & TrollStore tIPA
         shell: bash
         run: |
-          echo '#import <mach/mach.h>' | cat - Natives/JavaLauncher.m > temp && mv temp Natives/JavaLauncher.m
-
           JDK_BASE_PATH="${{ steps.setup-java.outputs.path }}"
           export PATH="$JDK_BASE_PATH/bin:/opt/homebrew/bin:$PATH"
           export JAVA_HOME="$JDK_BASE_PATH"
@@ -85,9 +81,9 @@ jobs:
           SIGN_FLAGS="CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="
 
           # WARNING MITIGATION: Filter runtime stderr streams to suppress repetitive upstream vtool signature warnings
-          gmake package PLATFORM=2 $SIGN_FLAGS 2> >(grep -v "vtool warning: code signature will be invalid" >&2)
+          gmake JOBS=1 package PLATFORM=2 $SIGN_FLAGS 2> >(grep -v "vtool warning: code signature will be invalid" >&2)
 
-          gmake package PLATFORM=2 TROLLSTORE_JIT_ENT=1 $SIGN_FLAGS 2> >(grep -v "vtool warning: code signature will be invalid" >&2)
+          gmake JOBS=1 package PLATFORM=2 TROLLSTORE_JIT_ENT=1 $SIGN_FLAGS 2> >(grep -v "vtool warning: code signature will be invalid" >&2)
 
       - name: Upload TrollStore tIPA (full)
         if: always()
