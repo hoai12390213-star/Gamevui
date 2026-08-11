@@ -41,7 +41,7 @@ jobs:
             -Dbinding.tinyexr=false -Dbinding.tootle=false -Dbinding.xxhash=false \
             -Dbinding.yoga=false -Dbinding.zstd=false \
             -Dbuild.type=release/3.3.1 -Djavadoc.skip=true \
-            -Dnashorn.args=--no-deprecation-warning compile release
+            -Dnashorn.args=--no-deprecation-warning compile release || test $? -eq 141
           mkdir -p ../../JavaApp/libs/lwjgl31
           find bin/RELEASE -name '*.jar' ! -name '*-natives-*' ! -name '*-sources.jar' -exec cp {} ../../JavaApp/libs/lwjgl31/ \;
 
