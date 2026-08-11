@@ -9,10 +9,56 @@
 #import <PhotosUI/PhotosUI.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
-@interface SettingsViewController () <UITableViewDelegate, UITableViewDataSource, UIColorPickerViewControllerDelegate, UINavigationControllerDelegate, UIImagePickerControllerDelegate, PHPickerViewControllerDelegate>
+@interface SettingsViewController () <UITableViewDelegate, UITableViewDataSource, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UIColorPickerViewControllerDelegate, UINavigationControllerDelegate, UIImagePickerControllerDelegate, PHPickerViewControllerDelegate>
 @property (nonatomic) UITableView *tableView;
+@property (nonatomic) UICollectionView *tabGridView;
+@property (nonatomic) NSLayoutConstraint *tabGridHeightConstraint;
 @property (nonatomic) NSArray *sections;
+@property (nonatomic) NSInteger selectedSectionIndex;
 @property (nonatomic, copy) void (^pendingColorPickCallback)(UIColor *);
+@end
+
+@interface SettingsTabCell : UICollectionViewCell
+@property (nonatomic) UIImageView *iconView;
+@property (nonatomic) UILabel *titleLabel;
+@end
+
+@implementation SettingsTabCell
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.contentView.layer.cornerRadius = 14;
+        self.contentView.layer.masksToBounds = YES;
+        self.contentView.layer.borderWidth = 1;
+
+        _iconView = [[UIImageView alloc] init];
+        _iconView.translatesAutoresizingMaskIntoConstraints = NO;
+        _iconView.contentMode = UIViewContentModeScaleAspectFit;
+        [self.contentView addSubview:_iconView];
+
+        _titleLabel = [[UILabel alloc] init];
+        _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        _titleLabel.textAlignment = NSTextAlignmentCenter;
+        _titleLabel.numberOfLines = 2;
+        _titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+        [self.contentView addSubview:_titleLabel];
+
+        [NSLayoutConstraint activateConstraints:@[
+            [_iconView.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
+            [_iconView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:16],
+            [_iconView.widthAnchor constraintEqualToConstant:24],
+            [_iconView.heightAnchor constraintEqualToConstant:24],
+
+            [_titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:8],
+            [_titleLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-8],
+            [_titleLabel.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
+            [_titleLabel.topAnchor constraintEqualToAnchor:_iconView.bottomAnchor constant:10],
+        ]];
+    }
+    return self;
+}
+
 @end
 
 @implementation SettingsViewController
@@ -20,6 +66,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     [self buildSections];
+    _selectedSectionIndex = 0;
     [self setup];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(updateColors) name:ThemeDidChangeNotification object:nil];
     [self updateColors];
@@ -38,13 +85,13 @@
     NSArray *zinkOptLevels = @[@"-1", @"0", @"1", @"2", @"3", @"4", @"5"];
 
     _sections = @[
-        @{@"title": localize(@"Render", nil), @"items": @[
+        @{@"title": localize(@"Render", nil), @"icon": @"display", @"items": @[
             @{@"type": @"picker", @"label": localize(@"preference.title.renderer", nil), @"key": @"video.renderer", @"options": rendererOptions, @"default": @"auto"},
             @{@"type": @"slider", @"label": localize(@"preference.title.resolution", nil), @"key": @"video.resolution", @"min": @25, @"max": @150, @"suffix": @"%"},
             @{@"type": @"switch", @"label": localize(@"preference.title.max_framerate", nil), @"key": @"video.max_framerate"},
             @{@"type": @"switch", @"label": localize(@"preference.title.performance_hud", nil), @"key": @"video.performance_hud"},
         ]},
-        @{@"title": localize(@"Custom Controls", nil), @"items": @[
+        @{@"title": localize(@"Custom Controls", nil), @"icon": @"slider.horizontal.3", @"items": @[
             @{@"type": @"slider", @"label": localize(@"preference.title.button_scale", nil), @"key": @"control.button_scale", @"min": @30, @"max": @200, @"suffix": @"%"},
             @{@"type": @"slider", @"label": localize(@"preference.title.mouse_scale", nil), @"key": @"control.mouse_scale", @"min": @30, @"max": @200, @"suffix": @"%"},
             @{@"type": @"slider", @"label": localize(@"preference.title.mouse_speed", nil), @"key": @"control.mouse_speed", @"min": @10, @"max": @300, @"suffix": @"%"},
@@ -61,22 +108,22 @@
             @{@"type": @"navigate", @"label": localize(@"Mouse Cursors", nil), @"vc": @"CursorManageViewController"},
             @{@"type": @"navigate", @"label": localize(@"Edit Controls Layout", nil), @"vc": @"CustomControlsViewController"},
         ]},
-        @{@"title": localize(@"Game", nil), @"items": @[
+        @{@"title": localize(@"Game", nil), @"icon": @"gamecontroller.fill", @"items": @[
             @{@"type": @"picker", @"label": localize(@"LWJGL Version", nil), @"key": @"java.lwjgl_version", @"options": lwjglItems, @"default": @"(auto)"},
             @{@"type": @"switch", @"label": localize(@"preference.title.fullscreen_airplay", nil), @"key": @"video.fullscreen_airplay"},
         ]},
-        @{@"title": localize(@"Audio", nil), @"items": @[
+        @{@"title": localize(@"Audio", nil), @"icon": @"speaker.wave.3.fill", @"items": @[
             @{@"type": @"switch", @"label": localize(@"preference.title.allow_microphone", nil), @"key": @"video.allow_microphone"},
             @{@"type": @"picker", @"label": localize(@"preference.title.microphone_source", nil), @"key": @"video.microphone_source", @"options": @[@"auto", @"front", @"bottom", @"back"], @"default": @"auto"},
             @{@"type": @"switch", @"label": localize(@"preference.title.silence_other_audio", nil), @"key": @"video.silence_other_audio"},
         ]},
-        @{@"title": localize(@"Gamepad", nil), @"items": @[
+        @{@"title": localize(@"Gamepad", nil), @"icon": @"dpad.fill", @"items": @[
             @{@"type": @"picker", @"label": localize(@"preference.title.default_gamepad_ctrl", nil), @"key": @"control.controller_type", @"options": @[@"none", @"mfi", @"ps4", @"ps5", @"xbox"], @"default": @"none"},
             @{@"type": @"slider", @"label": localize(@"preference.title.gamepad_sensitivity", nil), @"key": @"control.gamepad_sensitivity", @"min": @10, @"max": @300, @"suffix": @"%"},
             @{@"type": @"switch", @"label": localize(@"preference.title.hardware_hide", nil), @"key": @"control.hardware_hide"},
             @{@"type": @"navigate", @"label": localize(@"Gamepad Layout", nil), @"vc": @"LauncherPrefContCfgViewController"},
         ]},
-        @{@"title": localize(@"Launcher", nil), @"items": @[
+        @{@"title": localize(@"Launcher", nil), @"icon": @"terminal.fill", @"items": @[
             @{@"type": @"navigate", @"label": localize(@"preference.title.game_directory", nil), @"vc": @"LauncherPrefGameDirViewController"},
             @{@"type": @"navigate", @"label": localize(@"preference.title.manage_runtime", nil) , @"vc": @"LauncherPrefManageJREViewController"},
             @{@"type": @"text", @"label": localize(@"preference.title.java_args", nil), @"key": @"java.java_args", @"placeholder": @"-Xmx2G -Xms512M"},
@@ -92,7 +139,7 @@
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_ipad_ui", nil), @"key": @"debug.debug_ipad_ui"},
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_skip_wait_jit", nil), @"key": @"debug.debug_skip_wait_jit"},
         ]},
-        @{@"title": localize(@"MobileGlues", nil), @"items": @[
+        @{@"title": localize(@"MobileGlues", nil), @"icon": @"cube.transparent.fill", @"items": @[
             @{@"type": @"switch", @"label": localize(@"preference.title.enable_angle", nil), @"key": @"mobileglues.enable_angle"},
             @{@"type": @"picker", @"label": localize(@"preference.title.enable_no_error", nil), @"key": @"mobileglues.enable_no_error", @"options": @[@"0", @"1", @"2"], @"default": @"0"},
             @{@"type": @"switch", @"label": localize(@"preference.title.enable_ext_timer_query", nil), @"key": @"mobileglues.enable_ext_timer_query"},
@@ -104,14 +151,14 @@
             @{@"type": @"picker", @"label": localize(@"preference.title.custom_gl_version", nil), @"key": @"mobileglues.custom_gl_version", @"options": glVersions, @"default": @"0"},
             @{@"type": @"picker", @"label": localize(@"preference.title.fsr1_setting", nil), @"key": @"mobileglues.fsr1_setting", @"options": @[@"0", @"1", @"2", @"3", @"4", @"5"], @"default": @"0"},
         ]},
-        @{@"title": localize(@"Zink", nil), @"items": @[
+        @{@"title": localize(@"Zink", nil), @"icon": @"triangle.fill", @"items": @[
             @{@"type": @"picker", @"label": localize(@"Optimization Level", nil), @"key": @"zink.optimization_level", @"options": zinkOptLevels, @"default": @"-1"},
             @{@"type": @"picker", @"label": localize(@"preference.title.zink_gl_override", nil), @"key": @"zink.gl_override", @"options": @[@"0", @"3.3", @"4.0", @"4.1", @"4.3", @"4.6"], @"default": @"0"},
             @{@"type": @"switch", @"label": localize(@"preference.title.zink_enable_gl_thread", nil), @"key": @"zink.enable_gl_thread"},
             @{@"type": @"slider", @"label": localize(@"preference.title.zink_glsl_cache_size", nil), @"key": @"zink.glsl_cache_size", @"min": @8, @"max": @512, @"suffix": @"MB"},
             @{@"type": @"picker", @"label": localize(@"preference.title.zink_api_features", nil), @"key": @"zink.api_features", @"options": @[@"0", @"1", @"2", @"3"], @"default": @"3"},
         ]},
-        @{@"title": localize(@"Debug", nil), @"items": @[
+        @{@"title": localize(@"Debug", nil), @"icon": @"ladybug.fill", @"items": @[
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_always_attached_jit", nil), @"key": @"debug.debug_always_attached_jit"},
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_hide_home_indicator", nil), @"key": @"debug.debug_hide_home_indicator"},
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_auto_correction", nil), @"key": @"debug.debug_auto_correction"},
@@ -120,7 +167,7 @@
             @{@"type": @"text", @"label": localize(@"Debug Server Token", nil), @"key": @"debug.debug_server_token", @"placeholder": @""},
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_server_localhost_only", nil), @"key": @"debug.debug_server_localhost_only"},
         ]},
-        @{@"title": localize(@"Appearance", nil), @"items": @[
+        @{@"title": localize(@"Appearance", nil), @"icon": @"paintbrush.pointed.fill", @"items": @[
             @{@"type": @"color", @"label": localize(@"Accent Color", nil), @"key": @"amethyst_accent_color"},
             @{@"type": @"color", @"label": localize(@"Background Color", nil), @"key": @"amethyst_bg_color"},
             @{@"type": @"color", @"label": localize(@"Sidebar Color", nil), @"key": @"amethyst_sidebar_bg_color"},
@@ -167,6 +214,20 @@
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(dismissSettings)];
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:localize(@"preference.title.reset_settings", nil) style:UIBarButtonItemStylePlain target:self action:@selector(resetSettings)];
 
+    UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
+    layout.minimumInteritemSpacing = 8;
+    layout.minimumLineSpacing = 8;
+    layout.sectionInset = UIEdgeInsetsMake(12, 12, 12, 12);
+
+    _tabGridView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:layout];
+    _tabGridView.translatesAutoresizingMaskIntoConstraints = NO;
+    _tabGridView.backgroundColor = [UIColor clearColor];
+    _tabGridView.delegate = self;
+    _tabGridView.dataSource = self;
+    _tabGridView.scrollEnabled = NO;
+    [_tabGridView registerClass:SettingsTabCell.class forCellWithReuseIdentifier:@"SettingsTabCell"];
+    [self.view addSubview:_tabGridView];
+
     _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
     _tableView.translatesAutoresizingMaskIntoConstraints = NO;
     _tableView.delegate = self;
@@ -175,8 +236,15 @@
     _tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
     [self.view addSubview:_tableView];
 
+    _tabGridHeightConstraint = [_tabGridView.heightAnchor constraintEqualToConstant:240];
+    _tabGridHeightConstraint.active = YES;
+
     [NSLayoutConstraint activateConstraints:@[
-        [_tableView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [_tabGridView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [_tabGridView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [_tabGridView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+
+        [_tableView.topAnchor constraintEqualToAnchor:_tabGridView.bottomAnchor constant:4],
         [_tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [_tableView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
@@ -191,62 +259,85 @@
     ThemeManager *theme = ThemeManager.shared;
     self.view.backgroundColor = theme.contentBackgroundColor;
     _tableView.backgroundColor = theme.contentBackgroundColor;
+    _tabGridView.backgroundColor = [UIColor clearColor];
+    [_tabGridView reloadData];
+    [_tableView reloadData];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+
+    CGFloat width = self.view.bounds.size.width;
+    if (width <= 0) return;
+
+    UICollectionViewFlowLayout *layout = (UICollectionViewFlowLayout *)_tabGridView.collectionViewLayout;
+    CGFloat inset = layout.sectionInset.left + layout.sectionInset.right;
+    CGFloat spacing = layout.minimumInteritemSpacing;
+    BOOL isLandscape = self.view.bounds.size.width > self.view.bounds.size.height;
+    BOOL isPad = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad);
+    NSInteger columns = 2;
+    if (isPad) {
+        columns = 5;
+    } else if (isLandscape) {
+        columns = 5;
+    }
+    columns = MAX(columns, 2);
+
+    CGFloat itemWidth = floor((width - inset - (spacing * (columns - 1))) / (CGFloat)columns);
+    CGFloat minItemWidth = isPad ? 104.0 : (isLandscape ? 92.0 : 120.0);
+    itemWidth = MAX(itemWidth, minItemWidth);
+    layout.itemSize = CGSizeMake(itemWidth, itemWidth);
+
+    NSInteger count = _sections.count;
+    NSInteger rows = (count + columns - 1) / columns;
+    CGFloat height = layout.sectionInset.top + layout.sectionInset.bottom + rows * itemWidth + MAX(rows - 1, 0) * layout.minimumLineSpacing;
+    _tabGridHeightConstraint.constant = height;
+}
+
+#pragma mark - Tab Grid
+
+- (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
+    return _sections.count;
+}
+
+- (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
+    SettingsTabCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"SettingsTabCell" forIndexPath:indexPath];
+    NSDictionary *section = _sections[indexPath.item];
+    NSString *title = section[@"title"] ?: @"";
+    NSString *iconName = section[@"icon"] ?: @"gearshape.fill";
+    cell.titleLabel.text = title;
+    UIImage *icon = [[UIImage systemImageNamed:iconName] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    if (!icon) {
+        icon = [UIImage systemImageNamed:@"gearshape.fill"];
+    }
+    cell.iconView.image = icon;
+
+    ThemeManager *theme = ThemeManager.shared;
+    BOOL selected = (indexPath.item == _selectedSectionIndex);
+    cell.contentView.backgroundColor = selected ? [theme.accentColor colorWithAlphaComponent:0.16] : theme.cardBackgroundColor;
+    cell.contentView.layer.borderColor = (selected ? theme.accentColor : theme.separatorColor).CGColor;
+    cell.iconView.tintColor = selected ? theme.accentColor : theme.secondaryTextColor;
+    cell.titleLabel.textColor = selected ? theme.accentColor : theme.primaryTextColor;
+    return cell;
+}
+
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    if (_selectedSectionIndex == indexPath.item) return;
+    [HapticManager.shared play:HapticTypeLight];
+    _selectedSectionIndex = indexPath.item;
+    [_tabGridView reloadData];
+    [_tableView reloadData];
+    [_tableView setContentOffset:CGPointZero animated:NO];
 }
 
 #pragma mark - TableView
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return _sections.count;
+    return 1;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return [_sections[section][@"items"] count];
-}
-
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    return _sections[section][@"title"];
-}
-
-- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    NSString *title = _sections[section][@"title"];
-    if (!title) return nil;
-
-    UIView *header = [[UIView alloc] init];
-    header.backgroundColor = [UIColor clearColor];
-
-    UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
-    btn.translatesAutoresizingMaskIntoConstraints = NO;
-    [btn setTitle:title forState:UIControlStateNormal];
-    btn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
-    btn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
-    btn.contentEdgeInsets = UIEdgeInsetsMake(0, 16, 0, 0);
-    [btn setTitleColor:ThemeManager.shared.secondaryTextColor forState:UIControlStateNormal];
-    [btn addTarget:self action:@selector(scrollToSection:) forControlEvents:UIControlEventTouchUpInside];
-    btn.tag = section;
-    [header addSubview:btn];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [btn.leadingAnchor constraintEqualToAnchor:header.leadingAnchor],
-        [btn.trailingAnchor constraintEqualToAnchor:header.trailingAnchor],
-        [btn.topAnchor constraintEqualToAnchor:header.topAnchor],
-        [btn.bottomAnchor constraintEqualToAnchor:header.bottomAnchor],
-    ]];
-
-    return header;
-}
-
-- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return 36;
-}
-
-- (void)scrollToSection:(UIButton *)sender {
-    [HapticManager.shared play:HapticTypeLight];
-    NSInteger section = sender.tag;
-    NSInteger firstRow = [_tableView numberOfRowsInSection:section];
-    if (firstRow > 0) {
-        NSIndexPath *ip = [NSIndexPath indexPathForRow:0 inSection:section];
-        [_tableView scrollToRowAtIndexPath:ip atScrollPosition:UITableViewScrollPositionTop animated:YES];
-    }
+    return [_sections[_selectedSectionIndex][@"items"] count];
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -254,7 +345,7 @@
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    NSDictionary *item = _sections[indexPath.section][@"items"][indexPath.row];
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][indexPath.row];
     NSString *type = item[@"type"];
     NSString *cellId = type;
 
@@ -477,7 +568,7 @@
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    NSDictionary *item = _sections[indexPath.section][@"items"][indexPath.row];
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][indexPath.row];
     NSString *type = item[@"type"];
 
     if ([type isEqualToString:@"picker"]) {
@@ -504,7 +595,7 @@
     }
     NSIndexPath *ip = [_tableView indexPathForCell:cell];
     if (!ip) return;
-    NSDictionary *item = _sections[ip.section][@"items"][ip.row];
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][ip.row];
     setPrefBool(item[@"key"], sender.on);
     if ([item[@"key"] isEqualToString:@"java.auto_ram"]) {
         if (!sender.on) {
@@ -536,7 +627,7 @@
     UITableViewCell *cell = (UITableViewCell *)sender.superview.superview;
     NSIndexPath *ip = [_tableView indexPathForCell:cell];
     if (!ip) return;
-    NSDictionary *item = _sections[ip.section][@"items"][ip.row];
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][ip.row];
     float val = roundf(sender.value);
     if ([item[@"key"] isEqualToString:@"amethyst_bg_blur"]) {
         ThemeManager.shared.backgroundBlurIntensity = val;
@@ -556,7 +647,7 @@
     UITableViewCell *cell = (UITableViewCell *)sender.superview.superview;
     NSIndexPath *ip = [_tableView indexPathForCell:cell];
     if (!ip) return;
-    NSDictionary *item = _sections[ip.section][@"items"][ip.row];
+    NSDictionary *item = _sections[_selectedSectionIndex][@"items"][ip.row];
     NSString *key = item[@"key"];
     NSString *value = sender.text ?: @"";
     setPrefObject(key, value);
