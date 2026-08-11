@@ -117,7 +117,7 @@ public final class Library {
         // METHOD 1: absolute path
         if (Paths.get(name).isAbsolute()) {
             load.accept(name);
-            apiLogMore("Success");
+            apiLog("Success");
             return;
         }
 
@@ -138,7 +138,7 @@ public final class Library {
                     String regular = getRegularFilePath(libURL);
                     if (regular != null) {
                         load.accept(regular);
-                        apiLogMore("Loaded from classpath: " + regular);
+                        apiLog("Loaded from classpath: " + regular);
                         return;
                     }
                 }
@@ -146,7 +146,7 @@ public final class Library {
                 // Always use the SLL if the library is found in the classpath,
                 // so that newer versions can be detected.
                 if (debugLoader) {
-                    apiLogMore("Using SharedLibraryLoader...");
+                    apiLog("Using SharedLibraryLoader...");
                 }
                 // Extract from classpath and try org.lwjgl.librarypath
                 try (FileChannel ignored = SharedLibraryLoader.load(name, libName, libURL, load)) {
@@ -178,16 +178,16 @@ public final class Library {
             // In that case, ClassLoader::findLibrary was used to return the library path (e.g. OSGi does this with native libraries in bundles).
             Path libFile = javaLibraryPath == null ? null : findFile(javaLibraryPath, module, libName, bundledWithLWJGL);
             if (libFile != null) {
-                apiLogMore(String.format("Loaded from %s: %s", JAVA_LIBRARY_PATH, libFile));
+                apiLog(String.format("Loaded from %s: %s", JAVA_LIBRARY_PATH, libFile));
                 if (bundledWithLWJGL) {
                     checkHash(context, libFile, module, libName);
                 }
             } else {
-                apiLogMore("Loaded from a ClassLoader provided path.");
+                apiLog("Loaded from a ClassLoader provided path.");
             }
             return;
         } catch (Throwable t) {
-            apiLogMore(libName + " not found in " + JAVA_LIBRARY_PATH);
+            apiLog(libName + " not found in " + JAVA_LIBRARY_PATH);
         }
 
         detectPlatformMismatch(context, module);
@@ -203,12 +203,12 @@ public final class Library {
     private static boolean loadSystem(Consumer<String> load, Class<?> context, String module, String libName, boolean bundledWithLWJGL, String property, String paths) {
         Path libFile = findFile(paths, module, libName, bundledWithLWJGL);
         if (libFile == null) {
-            apiLogMore(libName + " not found in " + property + "=" + paths);
+            apiLog(libName + " not found in " + property + "=" + paths);
             return false;
         }
 
         load.accept(libFile.toAbsolutePath().toString());
-        apiLogMore("Loaded from " + property + ": " + libFile);
+        apiLog("Loaded from " + property + ": " + libFile);
         if (bundledWithLWJGL) {
             checkHash(context, libFile, module, libName);
         }
@@ -270,7 +270,7 @@ public final class Library {
         // METHOD 1: absolute path
         if (Paths.get(name).isAbsolute()) {
             SharedLibrary lib = apiCreateLibrary(name);
-            apiLogMore("Success");
+            apiLog("Success");
             return lib;
         }
 
@@ -291,7 +291,7 @@ public final class Library {
                     String regular = getRegularFilePath(libURL);
                     if (regular != null) {
                         lib = apiCreateLibrary(regular);
-                        apiLogMore("Loaded from classpath: " + regular);
+                        apiLog("Loaded from classpath: " + regular);
                         return lib;
                     }
                 }
@@ -299,7 +299,7 @@ public final class Library {
                 // Always use the SLL if the library is found in the classpath,
                 // so that newer versions can be detected.
                 if (debugLoader) {
-                    apiLogMore("Using SharedLibraryLoader...");
+                    apiLog("Using SharedLibraryLoader...");
                 }
                 // Extract from classpath and try org.lwjgl.librarypath
                 try (FileChannel ignored = SharedLibraryLoader.load(name, libName, libURL, null)) {
@@ -334,7 +334,7 @@ public final class Library {
                     String libPath = (String)findLibrary.invoke(context.getClassLoader(), name);
                     if (libPath != null) {
                         lib = apiCreateLibrary(libPath);
-                        apiLogMore("Loaded from ClassLoader provided path: " + libPath);
+                        apiLog("Loaded from ClassLoader provided path: " + libPath);
                         return lib;
                     }
                 } catch (Exception ignored) {
@@ -372,12 +372,12 @@ public final class Library {
         try {
             lib = apiCreateLibrary(libName);
             String path = lib.getPath();
-            apiLogMore(path == null
+            apiLog(path == null
                 ? "Loaded from system paths"
                 : "Loaded from system paths: " + path);
         } catch (UnsatisfiedLinkError e) {
             lib = null;
-            apiLogMore(libName + " not found in system paths");
+            apiLog(libName + " not found in system paths");
         }
         return lib;
     }
@@ -393,12 +393,12 @@ public final class Library {
     private static @Nullable SharedLibrary loadNative(Class<?> context, String module, String libName, boolean bundledWithLWJGL, String property, String paths) {
         Path libFile = findFile(paths, module, libName, bundledWithLWJGL);
         if (libFile == null) {
-            apiLogMore(libName + " not found in " + property + "=" + paths);
+            apiLog(libName + " not found in " + property + "=" + paths);
             return null;
         }
 
         SharedLibrary lib = apiCreateLibrary(libFile.toAbsolutePath().toString());
-        apiLogMore("Loaded from " + property + ": " + libFile);
+        apiLog("Loaded from " + property + ": " + libFile);
         if (bundledWithLWJGL) {
             checkHash(context, libFile, module, libName);
         }

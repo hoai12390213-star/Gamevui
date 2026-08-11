@@ -146,7 +146,8 @@
         [_versionsScroll.topAnchor constraintEqualToAnchor:_versionsLabel.bottomAnchor constant:4],
         [_versionsScroll.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor],
         [_versionsScroll.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor],
-        [_versionsScroll.heightAnchor constraintEqualToConstant:120],
+        [_versionsScroll.bottomAnchor constraintEqualToAnchor:_addVersionButton.topAnchor constant:-4],
+        [_versionsScroll.heightAnchor constraintGreaterThanOrEqualToConstant:36],
 
         [_versionsStack.topAnchor constraintEqualToAnchor:_versionsScroll.topAnchor],
         [_versionsStack.leadingAnchor constraintEqualToAnchor:_versionsScroll.leadingAnchor],
@@ -154,20 +155,20 @@
         [_versionsStack.bottomAnchor constraintEqualToAnchor:_versionsScroll.bottomAnchor],
         [_versionsStack.widthAnchor constraintEqualToAnchor:_versionsScroll.widthAnchor],
 
-        [_addVersionButton.topAnchor constraintEqualToAnchor:_versionsScroll.bottomAnchor constant:4],
         [_addVersionButton.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:4],
         [_addVersionButton.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-4],
         [_addVersionButton.heightAnchor constraintEqualToConstant:28],
+        [_addVersionButton.bottomAnchor constraintEqualToAnchor:separator2.topAnchor constant:-8],
 
-        [separator2.topAnchor constraintEqualToAnchor:_addVersionButton.bottomAnchor constant:8],
         [separator2.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:4],
         [separator2.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-4],
         [separator2.heightAnchor constraintEqualToConstant:1],
+        [separator2.bottomAnchor constraintEqualToAnchor:_downloadHubButton.topAnchor constant:-8],
 
         [_downloadHubButton.centerXAnchor constraintEqualToAnchor:contentView.centerXAnchor],
-        [_downloadHubButton.topAnchor constraintEqualToAnchor:separator2.bottomAnchor constant:8],
         [_downloadHubButton.widthAnchor constraintEqualToConstant:32],
         [_downloadHubButton.heightAnchor constraintEqualToConstant:32],
+        [_downloadHubButton.bottomAnchor constraintEqualToAnchor:_launchButton.topAnchor constant:-8],
 
         [_launchButton.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:4],
         [_launchButton.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-4],

@@ -22,8 +22,57 @@
 #import "PLProfiles.h"
 #import "VersionDirectoryManager.h"
 #import "TouchControllerManager.h"
+#import "UZKArchive.h"
 
 static NSString *dhNativeLibPath = nil;
+
+static BOOL setupJnaNativeLibrary(NSString *jnaTmpDir) {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *dst = [jnaTmpDir stringByAppendingPathComponent:@"libjnidispatch.dylib"];
+    [fm removeItemAtPath:dst error:nil];
+
+    NSArray<NSString *> *jnaJarCandidates = @[
+        [NSString stringWithFormat:@"%s/libraries/net/java/dev/jna/jna/5.13.0/jna-5.13.0.jar", getenv("POJAV_GAME_DIR")],
+        [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"libs/jna-5.13.0.jar"],
+    ];
+    NSArray<NSString *> *nativeEntries = @[
+        @"com/sun/jna/darwin-aarch64/libjnidispatch.jnilib",
+        @"com/sun/jna/darwin/libjnidispatch.jnilib",
+    ];
+
+    for (NSString *jarPath in jnaJarCandidates) {
+        if (![fm fileExistsAtPath:jarPath]) {
+            continue;
+        }
+        UZKArchive *archive = [[UZKArchive alloc] initWithPath:jarPath error:nil];
+        if (!archive) {
+            continue;
+        }
+        for (NSString *entry in nativeEntries) {
+            NSError *extractError = nil;
+            NSData *nativeData = [archive extractDataFromFile:entry error:&extractError];
+            if (!nativeData) {
+                continue;
+            }
+            if ([nativeData writeToFile:dst options:NSDataWritingAtomic error:&extractError]) {
+                NSLog(@"[JavaLauncher] Extracted JNA native from %@ (%@)", jarPath.lastPathComponent, entry);
+                return YES;
+            }
+            NSLog(@"[JavaLauncher] Failed writing JNA native: %@", extractError.localizedDescription);
+        }
+    }
+
+    NSString *frameworkSrc = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Frameworks/libjnidispatch.dylib"];
+    if ([fm fileExistsAtPath:frameworkSrc]) {
+        NSError *copyError = nil;
+        if ([fm copyItemAtPath:frameworkSrc toPath:dst error:&copyError]) {
+            NSLog(@"[JavaLauncher] Copied libjnidispatch.dylib from Frameworks to %@", jnaTmpDir);
+            return YES;
+        }
+        NSLog(@"[JavaLauncher] Failed copying libjnidispatch.dylib: %@", copyError.localizedDescription);
+    }
+    return NO;
+}
 
 // Forward declaration for DH fix
 static void checkAndAddDhNativeLibPath(NSString *versionId);
@@ -504,16 +553,19 @@ int launchJVMWithArgs(NSString *username, id launchTarget, int width, int height
     margv[++margc] = "-Dfml.earlyprogresswindow=false";
 
     // JNA on iOS must load libjnidispatch from jna.boot.library.path
-    // (jna.nosys=true), so pre-copy the bundled 5.13.0 dylib into jna_tmp.
-    // POJAV_HOME/jna_tmp is what PojavLauncher.main points jna.boot.library.path at.
+    // (jna.nosys=true). Extract the 5.13.0 native from the JNA jar so the
+    // version always matches the bundled Java library (stale jna_tmp copies
+    // caused "Expected 6.1.6, Found 7.0.4" errors).
     NSString *jnaTmpDir = [NSString stringWithFormat:@"%s/jna_tmp", getenv("POJAV_HOME")];
     [fm createDirectoryAtPath:jnaTmpDir withIntermediateDirectories:YES attributes:nil error:nil];
-    NSString *jnidispatchSrc = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Frameworks/libjnidispatch.dylib"];
-    NSString *jnidispatchDst = [jnaTmpDir stringByAppendingPathComponent:@"libjnidispatch.dylib"];
-    if ([fm fileExistsAtPath:jnidispatchSrc] && ![fm fileExistsAtPath:jnidispatchDst]) {
-        NSLog(@"[JavaLauncher] Copying libjnidispatch.dylib to %@", jnidispatchDst);
-        [fm copyItemAtPath:jnidispatchSrc toPath:jnidispatchDst error:nil];
+    if (!setupJnaNativeLibrary(jnaTmpDir)) {
+        NSLog(@"[JavaLauncher] Warning: could not prepare libjnidispatch.dylib in jna_tmp");
     }
+    margv[++margc] = "-Djna.nosys=true";
+    margv[++margc] = "-Djna.nounpack=true";
+    margv[++margc] = "-Djna.noclassinit=true";
+    margv[++margc] = [NSString stringWithFormat:@"-Djna.tmpdir=%@", jnaTmpDir].UTF8String;
+    margv[++margc] = [NSString stringWithFormat:@"-Djna.boot.library.path=%@", jnaTmpDir].UTF8String;
 
     // Load java
     NSString *libjlipath8 = [NSString stringWithFormat:@"%@/lib/jli/libjli.dylib", javaHome]; // java 8

@@ -18,6 +18,7 @@
             @"cosmetica": @YES,
             @"debug_logging": @(!CONFIG_RELEASE),
             @"liquid_glass": @NO,
+            @"lock_landscape": @NO,
         }.mutableCopy,
         @"video": @{ // Video & Audio
             @"renderer": @"auto",
