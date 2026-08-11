@@ -15,6 +15,7 @@
 @property (nonatomic) NSLayoutConstraint *tabGridHeightConstraint;
 @property (nonatomic) NSArray *sections;
 @property (nonatomic) NSInteger selectedSectionIndex;
+@property (nonatomic) BOOL showingCategoryPicker;
 @property (nonatomic, copy) void (^pendingColorPickCallback)(UIColor *);
 @end
 
@@ -67,6 +68,7 @@
     [super viewDidLoad];
     [self buildSections];
     _selectedSectionIndex = 0;
+    _showingCategoryPicker = YES;
     [self setup];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(updateColors) name:ThemeDidChangeNotification object:nil];
     [self updateColors];
@@ -239,6 +241,8 @@
     _tabGridHeightConstraint = [_tabGridView.heightAnchor constraintEqualToConstant:240];
     _tabGridHeightConstraint.active = YES;
 
+    _tableView.hidden = YES;
+
     [NSLayoutConstraint activateConstraints:@[
         [_tabGridView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
         [_tabGridView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
@@ -252,7 +256,33 @@
 }
 
 - (void)dismissSettings {
-    [self dismissViewControllerAnimated:YES completion:nil];
+    UIViewController *presented = self.navigationController ?: self;
+    [presented dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)showCategoryPicker {
+    _showingCategoryPicker = YES;
+    _tabGridView.hidden = NO;
+    _tableView.hidden = YES;
+    self.navigationItem.title = localize(@"Settings", nil);
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:localize(@"preference.title.reset_settings", nil) style:UIBarButtonItemStylePlain target:self action:@selector(resetSettings)];
+    [self viewDidLayoutSubviews];
+    [_tabGridView reloadData];
+}
+
+- (void)showSectionDetail {
+    _showingCategoryPicker = NO;
+    _tabGridView.hidden = YES;
+    _tabGridHeightConstraint.constant = 0;
+    _tableView.hidden = NO;
+
+    NSDictionary *section = _sections[_selectedSectionIndex];
+    self.navigationItem.title = section[@"title"] ?: localize(@"Settings", nil);
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"chevron.left"] style:UIBarButtonItemStylePlain target:self action:@selector(showCategoryPicker)];
+
+    [_tabGridView reloadData];
+    [_tableView reloadData];
+    [_tableView setContentOffset:CGPointZero animated:NO];
 }
 
 - (void)updateColors {
@@ -266,6 +296,11 @@
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+
+    if (!_showingCategoryPicker) {
+        _tabGridHeightConstraint.constant = 0;
+        return;
+    }
 
     CGFloat width = self.view.bounds.size.width;
     if (width <= 0) return;
@@ -322,12 +357,9 @@
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (_selectedSectionIndex == indexPath.item) return;
     [HapticManager.shared play:HapticTypeLight];
     _selectedSectionIndex = indexPath.item;
-    [_tabGridView reloadData];
-    [_tableView reloadData];
-    [_tableView setContentOffset:CGPointZero animated:NO];
+    [self showSectionDetail];
 }
 
 #pragma mark - TableView
@@ -952,7 +984,11 @@
         [ThemeManager.shared applyThemeToAllWindows];
         [self resetAppearance];
         [self buildSections];
-        [self.tableView reloadData];
+        if (self.showingCategoryPicker) {
+            [self.tabGridView reloadData];
+        } else {
+            [self.tableView reloadData];
+        }
     }]];
     [self presentViewController:alert animated:YES completion:nil];
 }
