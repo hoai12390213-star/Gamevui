@@ -10,6 +10,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 @interface SettingsViewController () <UITableViewDelegate, UITableViewDataSource, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UIColorPickerViewControllerDelegate, UINavigationControllerDelegate, UIImagePickerControllerDelegate, PHPickerViewControllerDelegate>
+@property (nonatomic) UIScrollView *settingsScrollView;
 @property (nonatomic) UITableView *tableView;
 @property (nonatomic) UICollectionView *tabGridView;
 @property (nonatomic) NSLayoutConstraint *tabGridHeightConstraint;
@@ -42,19 +43,20 @@
         _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         _titleLabel.textAlignment = NSTextAlignmentCenter;
         _titleLabel.numberOfLines = 2;
-        _titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+        _titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
         [self.contentView addSubview:_titleLabel];
 
         [NSLayoutConstraint activateConstraints:@[
             [_iconView.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
-            [_iconView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:16],
-            [_iconView.widthAnchor constraintEqualToConstant:24],
-            [_iconView.heightAnchor constraintEqualToConstant:24],
+            [_iconView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:10],
+            [_iconView.widthAnchor constraintEqualToConstant:22],
+            [_iconView.heightAnchor constraintEqualToConstant:22],
 
-            [_titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:8],
-            [_titleLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-8],
+            [_titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:4],
+            [_titleLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-4],
             [_titleLabel.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
-            [_titleLabel.topAnchor constraintEqualToAnchor:_iconView.bottomAnchor constant:10],
+            [_titleLabel.topAnchor constraintEqualToAnchor:_iconView.bottomAnchor constant:6],
+            [_titleLabel.bottomAnchor constraintLessThanOrEqualToAnchor:self.contentView.bottomAnchor constant:-8],
         ]];
     }
     return self;
@@ -93,7 +95,7 @@
             @{@"type": @"switch", @"label": localize(@"preference.title.max_framerate", nil), @"key": @"video.max_framerate"},
             @{@"type": @"switch", @"label": localize(@"preference.title.performance_hud", nil), @"key": @"video.performance_hud"},
         ]},
-        @{@"title": localize(@"Custom Controls", nil), @"icon": @"slider.horizontal.3", @"items": @[
+        @{@"title": localize(@"Controls", nil), @"icon": @"slider.horizontal.3", @"items": @[
             @{@"type": @"slider", @"label": localize(@"preference.title.button_scale", nil), @"key": @"control.button_scale", @"min": @30, @"max": @200, @"suffix": @"%"},
             @{@"type": @"slider", @"label": localize(@"preference.title.mouse_scale", nil), @"key": @"control.mouse_scale", @"min": @30, @"max": @200, @"suffix": @"%"},
             @{@"type": @"slider", @"label": localize(@"preference.title.mouse_speed", nil), @"key": @"control.mouse_speed", @"min": @10, @"max": @300, @"suffix": @"%"},
@@ -141,7 +143,7 @@
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_ipad_ui", nil), @"key": @"debug.debug_ipad_ui"},
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_skip_wait_jit", nil), @"key": @"debug.debug_skip_wait_jit"},
         ]},
-        @{@"title": localize(@"MobileGlues", nil), @"icon": @"cube.transparent.fill", @"items": @[
+        @{@"title": localize(@"Glues", nil), @"icon": @"cube.transparent.fill", @"items": @[
             @{@"type": @"switch", @"label": localize(@"preference.title.enable_angle", nil), @"key": @"mobileglues.enable_angle"},
             @{@"type": @"picker", @"label": localize(@"preference.title.enable_no_error", nil), @"key": @"mobileglues.enable_no_error", @"options": @[@"0", @"1", @"2"], @"default": @"0"},
             @{@"type": @"switch", @"label": localize(@"preference.title.enable_ext_timer_query", nil), @"key": @"mobileglues.enable_ext_timer_query"},
@@ -154,11 +156,14 @@
             @{@"type": @"picker", @"label": localize(@"preference.title.fsr1_setting", nil), @"key": @"mobileglues.fsr1_setting", @"options": @[@"0", @"1", @"2", @"3", @"4", @"5"], @"default": @"0"},
         ]},
         @{@"title": localize(@"Zink", nil), @"icon": @"triangle.fill", @"items": @[
-            @{@"type": @"picker", @"label": localize(@"Optimization Level", nil), @"key": @"zink.optimization_level", @"options": zinkOptLevels, @"default": @"-1"},
-            @{@"type": @"picker", @"label": localize(@"preference.title.zink_gl_override", nil), @"key": @"zink.gl_override", @"options": @[@"0", @"3.3", @"4.0", @"4.1", @"4.3", @"4.6"], @"default": @"0"},
-            @{@"type": @"switch", @"label": localize(@"preference.title.zink_enable_gl_thread", nil), @"key": @"zink.enable_gl_thread"},
-            @{@"type": @"slider", @"label": localize(@"preference.title.zink_glsl_cache_size", nil), @"key": @"zink.glsl_cache_size", @"min": @8, @"max": @512, @"suffix": @"MB"},
-            @{@"type": @"picker", @"label": localize(@"preference.title.zink_api_features", nil), @"key": @"zink.api_features", @"options": @[@"0", @"1", @"2", @"3"], @"default": @"3"},
+            @{@"type": @"navigate", @"label": localize(@"preference.title.renderer", nil), @"vc": @"__open_renderer_picker__"},
+        ]},
+        @{@"title": localize(@"Zink (cũ)", nil), @"icon": @"triangle", @"items": @[
+            @{@"type": @"picker", @"label": localize(@"Optimization Level", nil), @"key": @"zink_legacy.optimization_level", @"options": zinkOptLevels, @"default": @"-1"},
+            @{@"type": @"picker", @"label": localize(@"preference.title.zink_gl_override", nil), @"key": @"zink_legacy.gl_override", @"options": @[@"0", @"3.3", @"4.0", @"4.1", @"4.3", @"4.6"], @"default": @"0"},
+            @{@"type": @"switch", @"label": localize(@"preference.title.zink_enable_gl_thread", nil), @"key": @"zink_legacy.enable_gl_thread"},
+            @{@"type": @"slider", @"label": localize(@"preference.title.zink_glsl_cache_size", nil), @"key": @"zink_legacy.glsl_cache_size", @"min": @8, @"max": @512, @"suffix": @"MB"},
+            @{@"type": @"picker", @"label": localize(@"preference.title.zink_api_features", nil), @"key": @"zink_legacy.api_features", @"options": @[@"0", @"1", @"2", @"3"], @"default": @"3"},
         ]},
         @{@"title": localize(@"Debug", nil), @"icon": @"ladybug.fill", @"items": @[
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_always_attached_jit", nil), @"key": @"debug.debug_always_attached_jit"},
@@ -169,7 +174,7 @@
             @{@"type": @"text", @"label": localize(@"Debug Server Token", nil), @"key": @"debug.debug_server_token", @"placeholder": @""},
             @{@"type": @"switch", @"label": localize(@"preference.title.debug_server_localhost_only", nil), @"key": @"debug.debug_server_localhost_only"},
         ]},
-        @{@"title": localize(@"Appearance", nil), @"icon": @"paintbrush.pointed.fill", @"items": @[
+        @{@"title": localize(@"Look", nil), @"icon": @"paintbrush.pointed.fill", @"items": @[
             @{@"type": @"color", @"label": localize(@"Accent Color", nil), @"key": @"amethyst_accent_color"},
             @{@"type": @"color", @"label": localize(@"Background Color", nil), @"key": @"amethyst_bg_color"},
             @{@"type": @"color", @"label": localize(@"Sidebar Color", nil), @"key": @"amethyst_sidebar_bg_color"},
@@ -216,9 +221,15 @@
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(dismissSettings)];
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:localize(@"preference.title.reset_settings", nil) style:UIBarButtonItemStylePlain target:self action:@selector(resetSettings)];
 
+    _settingsScrollView = [[UIScrollView alloc] init];
+    _settingsScrollView.translatesAutoresizingMaskIntoConstraints = NO;
+    _settingsScrollView.showsVerticalScrollIndicator = YES;
+    _settingsScrollView.alwaysBounceVertical = YES;
+    [self.view addSubview:_settingsScrollView];
+
     UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
-    layout.minimumInteritemSpacing = 8;
-    layout.minimumLineSpacing = 8;
+    layout.minimumInteritemSpacing = 10;
+    layout.minimumLineSpacing = 10;
     layout.sectionInset = UIEdgeInsetsMake(12, 12, 12, 12);
 
     _tabGridView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:layout];
@@ -228,7 +239,7 @@
     _tabGridView.dataSource = self;
     _tabGridView.scrollEnabled = NO;
     [_tabGridView registerClass:SettingsTabCell.class forCellWithReuseIdentifier:@"SettingsTabCell"];
-    [self.view addSubview:_tabGridView];
+    [_settingsScrollView addSubview:_tabGridView];
 
     _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
     _tableView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -242,13 +253,21 @@
     _tabGridHeightConstraint.active = YES;
 
     _tableView.hidden = YES;
+    _settingsScrollView.hidden = NO;
 
     [NSLayoutConstraint activateConstraints:@[
-        [_tabGridView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-        [_tabGridView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [_tabGridView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [_settingsScrollView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [_settingsScrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [_settingsScrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [_settingsScrollView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
 
-        [_tableView.topAnchor constraintEqualToAnchor:_tabGridView.bottomAnchor constant:4],
+        [_tabGridView.topAnchor constraintEqualToAnchor:_settingsScrollView.topAnchor],
+        [_tabGridView.leadingAnchor constraintEqualToAnchor:_settingsScrollView.leadingAnchor],
+        [_tabGridView.trailingAnchor constraintEqualToAnchor:_settingsScrollView.trailingAnchor],
+        [_tabGridView.bottomAnchor constraintEqualToAnchor:_settingsScrollView.bottomAnchor],
+        [_tabGridView.widthAnchor constraintEqualToAnchor:_settingsScrollView.widthAnchor],
+
+        [_tableView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
         [_tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [_tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [_tableView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
@@ -262,27 +281,48 @@
 
 - (void)showCategoryPicker {
     _showingCategoryPicker = YES;
-    _tabGridView.hidden = NO;
-    _tableView.hidden = YES;
     self.navigationItem.title = localize(@"Settings", nil);
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:localize(@"preference.title.reset_settings", nil) style:UIBarButtonItemStylePlain target:self action:@selector(resetSettings)];
+
+    _tableView.alpha = 1.0;
+    _settingsScrollView.alpha = 0.0;
+    _settingsScrollView.hidden = NO;
+    _tableView.hidden = YES;
+    _tabGridHeightConstraint.constant = MAX(_tabGridHeightConstraint.constant, 240);
+
     [self viewDidLayoutSubviews];
     [_tabGridView reloadData];
+
+    [UIView animateWithDuration:0.35 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+        self.settingsScrollView.alpha = 1.0;
+        self.settingsScrollView.transform = CGAffineTransformIdentity;
+        self.tableView.alpha = 0.0;
+        self.tableView.transform = CGAffineTransformMakeTranslation(-24, 0);
+    } completion:nil];
 }
 
 - (void)showSectionDetail {
     _showingCategoryPicker = NO;
-    _tabGridView.hidden = YES;
-    _tabGridHeightConstraint.constant = 0;
-    _tableView.hidden = NO;
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"chevron.left"] style:UIBarButtonItemStylePlain target:self action:@selector(showCategoryPicker)];
 
     NSDictionary *section = _sections[_selectedSectionIndex];
     self.navigationItem.title = section[@"title"] ?: localize(@"Settings", nil);
-    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"chevron.left"] style:UIBarButtonItemStylePlain target:self action:@selector(showCategoryPicker)];
 
-    [_tabGridView reloadData];
+    _tableView.hidden = NO;
+    _tableView.alpha = 0.0;
+    _tableView.transform = CGAffineTransformMakeTranslation(24, 0);
     [_tableView reloadData];
     [_tableView setContentOffset:CGPointZero animated:NO];
+
+    [UIView animateWithDuration:0.35 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+        self.settingsScrollView.alpha = 0.0;
+        self.settingsScrollView.transform = CGAffineTransformMakeTranslation(-24, 0);
+        self.tableView.alpha = 1.0;
+        self.tableView.transform = CGAffineTransformIdentity;
+    } completion:^(BOOL finished) {
+        self.settingsScrollView.hidden = YES;
+        self.settingsScrollView.transform = CGAffineTransformIdentity;
+    }];
 }
 
 - (void)updateColors {
@@ -298,7 +338,6 @@
     [super viewDidLayoutSubviews];
 
     if (!_showingCategoryPicker) {
-        _tabGridHeightConstraint.constant = 0;
         return;
     }
 
@@ -314,18 +353,19 @@
     if (isPad) {
         columns = 5;
     } else if (isLandscape) {
-        columns = 5;
+        columns = 4;
     }
     columns = MAX(columns, 2);
 
     CGFloat itemWidth = floor((width - inset - (spacing * (columns - 1))) / (CGFloat)columns);
-    CGFloat minItemWidth = isPad ? 104.0 : (isLandscape ? 92.0 : 120.0);
+    CGFloat minItemWidth = isPad ? 96.0 : (isLandscape ? 88.0 : 100.0);
     itemWidth = MAX(itemWidth, minItemWidth);
-    layout.itemSize = CGSizeMake(itemWidth, itemWidth);
+    CGFloat itemHeight = floor(itemWidth * 0.78);
+    layout.itemSize = CGSizeMake(itemWidth, itemHeight);
 
     NSInteger count = _sections.count;
     NSInteger rows = (count + columns - 1) / columns;
-    CGFloat height = layout.sectionInset.top + layout.sectionInset.bottom + rows * itemWidth + MAX(rows - 1, 0) * layout.minimumLineSpacing;
+    CGFloat height = layout.sectionInset.top + layout.sectionInset.bottom + rows * itemHeight + MAX(rows - 1, 0) * layout.minimumLineSpacing;
     _tabGridHeightConstraint.constant = height;
 }
 
@@ -940,6 +980,21 @@
 }
 
 - (void)navigateToVC:(NSString *)vcName title:(NSString *)title {
+    if ([vcName isEqualToString:@"__open_renderer_picker__"]) {
+        NSDictionary *renderSection = _sections.firstObject;
+        NSDictionary *rendererItem = nil;
+        for (NSDictionary *item in renderSection[@"items"]) {
+            if ([item[@"key"] isEqualToString:@"video.renderer"]) {
+                rendererItem = item;
+                break;
+            }
+        }
+        if (rendererItem) {
+            [self showPickerForItem:rendererItem];
+        }
+        return;
+    }
+
     Class vcClass = NSClassFromString(vcName);
     if (!vcClass) {
         showDialog(localize(@"Not Available", nil), [NSString stringWithFormat:localize(@"%@ is not available in this build.", nil), title]);

@@ -144,6 +144,14 @@ target_compile_definitions(ltw PRIVATE
   HAVE_OPENGL HAVE_OPENGL_ES_1 HAVE_OPENGL_ES_2
 )
 
+# Legacy Zink shim (Zink cũ) — forwards to libOSMesaLegacyCore.8.dylib
+add_library(OSMesaLegacy SHARED OSMesaLegacyShim/OSMesaLegacyShim.c)
+set_target_properties(OSMesaLegacy PROPERTIES
+  OUTPUT_NAME "OSMesaLegacy.8"
+  C_STANDARD 11
+  C_STANDARD_REQUIRED ON
+)
+
 # AFNetworking
 add_library(AFNetworking SHARED
   external/AFNetworking/AFNetworking/AFSecurityPolicy.m

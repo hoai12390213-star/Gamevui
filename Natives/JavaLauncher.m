@@ -362,11 +362,11 @@ int launchJVMWithArgs(NSString *username, id launchTarget, int width, int height
     NSLog(@"[JavaLauncher] RENDERER is set to %@\n", renderer);
     setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
 
-    // Apply Zink-specific environment variables if Zink renderer is selected
-    if ([renderer hasPrefix:@"libOSMesa"]) {
-        [ZinkConfig applyZinkEnvironmentFromPreferences];
-        NSString *configSummary = [ZinkConfig activeConfigSummary];
-        NSLog(@"[ZinkConfig] ========== Zink Renderer Active ==========");
+    // Apply Zink (cũ) environment only for the legacy renderer
+    if ([renderer isEqualToString:@ RENDERER_NAME_VK_ZINK_LEGACY]) {
+        [ZinkConfig applyZinkLegacyEnvironmentFromPreferences];
+        NSString *configSummary = [ZinkConfig activeLegacyConfigSummary];
+        NSLog(@"[ZinkConfig] ========== Zink Legacy Renderer Active ==========");
         NSLog(@"[ZinkConfig] %@", configSummary);
         setenv("ZINK_ACTIVE_CONFIG", configSummary.UTF8String, 1);
     }

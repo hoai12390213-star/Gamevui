@@ -48,7 +48,11 @@
             toView.frame = self.isPresenting ? offScreenLeft : offScreenRight;
             break;
         case TransitionTypeSlideUp:
-            toView.frame = self.isPresenting ? offScreenBottom : offScreenBottom;
+            if (self.isPresenting) {
+                toView.frame = offScreenBottom;
+            } else {
+                toView.frame = initialFrame;
+            }
             break;
         case TransitionTypeFade:
             toView.alpha = 0;
@@ -66,6 +70,8 @@
             toView.frame = initialFrame;
             if (self.isPresenting) {
                 fromView.transform = CGAffineTransformMakeScale(0.95, 0.95);
+            } else if (self.transitionType == TransitionTypeSlideUp) {
+                fromView.frame = offScreenBottom;
             } else {
                 fromView.frame = self.transitionType == TransitionTypeSlideFromRight ? offScreenRight : offScreenLeft;
             }

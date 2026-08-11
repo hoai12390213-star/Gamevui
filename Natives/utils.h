@@ -40,6 +40,7 @@
 #define RENDERER_NAME_MOBILEGLUES "libmobileglues.dylib"
 #define RENDERER_NAME_LTW "libltw.dylib"
 #define RENDERER_NAME_VK_ZINK "libOSMesa.8.dylib"
+#define RENDERER_NAME_VK_ZINK_LEGACY "libOSMesaLegacy.8.dylib"
 // Vulkan → MoltenVK → Metal direct renderer. The on-disk value is kept as the
 // historical "libMoltenVK.dylib" so existing profiles/settings stay valid.
 #define RENDERER_NAME_MOLTENVK "libMoltenVK.dylib"

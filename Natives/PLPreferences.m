@@ -90,6 +90,13 @@
             @"glsl_cache_size": @(32),
             @"api_features": @(0xFFFFFFFF)
         }.mutableCopy,
+        @"zink_legacy": @{
+            @"optimization_level": @(-1),
+            @"gl_override": @(0),
+            @"enable_gl_thread": @YES,
+            @"glsl_cache_size": @(32),
+            @"api_features": @(0xFFFFFFFF)
+        }.mutableCopy,
         @"internal": @{
             @"isolated": @NO,
             @"latest_version": [NSDictionary new]

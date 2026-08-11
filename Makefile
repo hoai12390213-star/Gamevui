@@ -257,7 +257,7 @@ check:
 		$(info $(shell printf "%-20s" "$(v)") = $(value $(v)))) \
 	)
 
-native: dep_mg
+native: dep_mg dep_zink
 	echo '[Amethyst v$(VERSION)] native - start'
 	mkdir -p $(WORKINGDIR)
 	cd $(WORKINGDIR) && cmake \
@@ -333,6 +333,17 @@ $(SOURCEDIR)/Natives/external/MobileGlues/src/main/cpp/
 	cp $(WORKINGDIR)/mobileglues/libmobileglues*.dylib $(WORKINGDIR)/
 	cp $(WORKINGDIR)/mobileglues/libspirv-cross*.dylib $(WORKINGDIR)/ 2>/dev/null || true
 	echo '[Amethyst v$(VERSION)] dep_mg - end'
+
+dep_zink:
+	echo '[Amethyst v$(VERSION)] dep_zink - start'
+	mkdir -p $(SOURCEDIR)/Natives/resources/Frameworks
+	if [ ! -f "$(SOURCEDIR)/Natives/resources/Frameworks/libOSMesa.8.dylib" ] || [ "$$FORCE_ZINK" = "1" ]; then \
+		wget -q -O "$(SOURCEDIR)/Natives/resources/Frameworks/libOSMesa.8.dylib" \
+			"https://github.com/AngelAuraMC/Amethyst-iOS/raw/main/Natives/resources/Frameworks/libOSMesa.8.dylib" || \
+		curl -fsSL -o "$(SOURCEDIR)/Natives/resources/Frameworks/libOSMesa.8.dylib" \
+			"https://github.com/AngelAuraMC/Amethyst-iOS/raw/main/Natives/resources/Frameworks/libOSMesa.8.dylib"; \
+	fi
+	echo '[Amethyst v$(VERSION)] dep_zink - end'
 
 assets:
 	echo '[Amethyst v$(VERSION)] assets - start'

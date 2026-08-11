@@ -18,6 +18,8 @@
 @property (nonatomic) UIScrollView *versionsScroll;
 @property (nonatomic) UIButton *addVersionButton;
 @property (nonatomic) NSArray *installedVersions;
+@property (nonatomic) NSLayoutConstraint *skinSizeConstraint;
+@property (nonatomic) NSLayoutConstraint *launchHeightConstraint;
 @end
 
 @implementation RightPanelViewController
@@ -50,7 +52,7 @@
 
     _accountNameLabel = [[UILabel alloc] init];
     _accountNameLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _accountNameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
+    _accountNameLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
     _accountNameLabel.textAlignment = NSTextAlignmentCenter;
     _accountNameLabel.text = localize(@"account.no_account", nil);
     _accountNameLabel.numberOfLines = 2;
@@ -68,7 +70,7 @@
 
     _versionsLabel = [[UILabel alloc] init];
     _versionsLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _versionsLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightSemibold];
+    _versionsLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
     _versionsLabel.text = @"VERSIONS";
     [contentView addSubview:_versionsLabel];
 
@@ -80,12 +82,12 @@
     _versionsStack = [[UIStackView alloc] init];
     _versionsStack.translatesAutoresizingMaskIntoConstraints = NO;
     _versionsStack.axis = UILayoutConstraintAxisVertical;
-    _versionsStack.spacing = 2;
+    _versionsStack.spacing = 6;
     [_versionsScroll addSubview:_versionsStack];
 
     _addVersionButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _addVersionButton.translatesAutoresizingMaskIntoConstraints = NO;
-    _addVersionButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    _addVersionButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
     [_addVersionButton setTitle:@"+ Add Version" forState:UIControlStateNormal];
     _addVersionButton.layer.cornerRadius = 8;
     _addVersionButton.clipsToBounds = YES;
@@ -107,7 +109,7 @@
 
     _launchButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _launchButton.translatesAutoresizingMaskIntoConstraints = NO;
-    _launchButton.titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
+    _launchButton.titleLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightBold];
     [_launchButton setTitle:@"▶" forState:UIControlStateNormal];
     _launchButton.layer.cornerRadius = 20;
     _launchButton.clipsToBounds = YES;
@@ -120,12 +122,10 @@
         [contentView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-6],
         [contentView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor constant:-8],
 
-        [_skinPreviewView.topAnchor constraintEqualToAnchor:contentView.topAnchor constant:4],
+        [_skinPreviewView.topAnchor constraintEqualToAnchor:contentView.topAnchor constant:6],
         [_skinPreviewView.centerXAnchor constraintEqualToAnchor:contentView.centerXAnchor],
-        [_skinPreviewView.widthAnchor constraintEqualToConstant:40],
-        [_skinPreviewView.heightAnchor constraintEqualToConstant:40],
 
-        [_accountNameLabel.topAnchor constraintEqualToAnchor:_skinPreviewView.bottomAnchor constant:2],
+        [_accountNameLabel.topAnchor constraintEqualToAnchor:_skinPreviewView.bottomAnchor constant:4],
         [_accountNameLabel.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor],
         [_accountNameLabel.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor],
 
@@ -147,7 +147,7 @@
         [_versionsScroll.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor],
         [_versionsScroll.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor],
         [_versionsScroll.bottomAnchor constraintEqualToAnchor:_addVersionButton.topAnchor constant:-4],
-        [_versionsScroll.heightAnchor constraintGreaterThanOrEqualToConstant:36],
+        [_versionsScroll.heightAnchor constraintGreaterThanOrEqualToConstant:56],
 
         [_versionsStack.topAnchor constraintEqualToAnchor:_versionsScroll.topAnchor],
         [_versionsStack.leadingAnchor constraintEqualToAnchor:_versionsScroll.leadingAnchor],
@@ -157,7 +157,7 @@
 
         [_addVersionButton.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:4],
         [_addVersionButton.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-4],
-        [_addVersionButton.heightAnchor constraintEqualToConstant:28],
+        [_addVersionButton.heightAnchor constraintEqualToConstant:36],
         [_addVersionButton.bottomAnchor constraintEqualToAnchor:separator2.topAnchor constant:-8],
 
         [separator2.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:4],
@@ -173,8 +173,23 @@
         [_launchButton.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:4],
         [_launchButton.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-4],
         [_launchButton.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-4],
-        [_launchButton.heightAnchor constraintEqualToConstant:44],
     ]];
+
+    _skinSizeConstraint = [_skinPreviewView.widthAnchor constraintEqualToConstant:52];
+    NSLayoutConstraint *skinHeight = [_skinPreviewView.heightAnchor constraintEqualToConstant:52];
+    _skinSizeConstraint.active = YES;
+    skinHeight.active = YES;
+    _launchHeightConstraint = [_launchButton.heightAnchor constraintEqualToConstant:52];
+    _launchHeightConstraint.active = YES;
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    BOOL isPortrait = self.view.bounds.size.width <= self.view.bounds.size.height;
+    CGFloat skinSize = isPortrait ? 56.0 : 48.0;
+    _skinSizeConstraint.constant = skinSize;
+    _skinPreviewView.layer.cornerRadius = skinSize * 0.2;
+    _launchHeightConstraint.constant = isPortrait ? 52.0 : 44.0;
 }
 
 - (void)updateColors {
@@ -247,16 +262,24 @@
     for (NSString *ver in _installedVersions) {
         UIView *row = [[UIView alloc] init];
         row.translatesAutoresizingMaskIntoConstraints = NO;
-        row.layer.cornerRadius = 4;
+        row.layer.cornerRadius = 8;
         row.clipsToBounds = YES;
         objc_setAssociatedObject(row, @selector(versionTapped:), ver, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
         BOOL isCurrent = [ver isEqualToString:currentVersion];
         if (isCurrent) {
             row.backgroundColor = [ThemeManager.shared.accentColor colorWithAlphaComponent:0.15];
-            row.layer.borderWidth = 1;
+            row.layer.borderWidth = 1.5;
             row.layer.borderColor = ThemeManager.shared.accentColor.CGColor;
+        } else {
+            row.backgroundColor = [ThemeManager.shared.cardBackgroundColor colorWithAlphaComponent:0.35];
         }
+
+        UIButton *rowButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        rowButton.translatesAutoresizingMaskIntoConstraints = NO;
+        rowButton.backgroundColor = UIColor.clearColor;
+        [rowButton addTarget:self action:@selector(versionRowTapped:) forControlEvents:UIControlEventTouchUpInside];
+        [row addSubview:rowButton];
 
         VersionProfile *profile = [VersionProfile profileWithVersionId:ver];
         NSString *displayName;
@@ -287,18 +310,16 @@
         UILabel *label = [[UILabel alloc] init];
         label.translatesAutoresizingMaskIntoConstraints = NO;
         label.text = isCurrent ? [NSString stringWithFormat:@"► %@", displayName] : displayName;
-        label.font = [UIFont systemFontOfSize:10 weight:isCurrent ? UIFontWeightBold : UIFontWeightMedium];
+        label.font = [UIFont systemFontOfSize:13 weight:isCurrent ? UIFontWeightBold : UIFontWeightMedium];
         label.textColor = isCurrent ? ThemeManager.shared.accentColor : ThemeManager.shared.primaryTextColor;
-        label.userInteractionEnabled = YES;
-        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(versionTapped:)];
-        [label addGestureRecognizer:tap];
+        label.userInteractionEnabled = NO;
         [row addSubview:label];
 
         if (isLoader) {
             UILabel *loaderTag = [[UILabel alloc] init];
             loaderTag.translatesAutoresizingMaskIntoConstraints = NO;
             loaderTag.text = profile.modLoader;
-            loaderTag.font = [UIFont systemFontOfSize:7 weight:UIFontWeightBold];
+            loaderTag.font = [UIFont systemFontOfSize:9 weight:UIFontWeightBold];
             loaderTag.textColor = ThemeManager.shared.accentColor;
             loaderTag.backgroundColor = [ThemeManager.shared.accentColor colorWithAlphaComponent:0.12];
             loaderTag.layer.cornerRadius = 3;
@@ -309,8 +330,8 @@
             [NSLayoutConstraint activateConstraints:@[
                 [loaderTag.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:2],
                 [loaderTag.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
-                [loaderTag.widthAnchor constraintEqualToConstant:32],
-                [loaderTag.heightAnchor constraintEqualToConstant:14],
+                [loaderTag.widthAnchor constraintEqualToConstant:40],
+                [loaderTag.heightAnchor constraintEqualToConstant:16],
             ]];
         }
 
@@ -331,26 +352,31 @@
         [row addSubview:delBtn];
 
         NSMutableArray *constraints = [NSMutableArray arrayWithArray:@[
-            [iconView.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:3],
+            [rowButton.topAnchor constraintEqualToAnchor:row.topAnchor],
+            [rowButton.leadingAnchor constraintEqualToAnchor:row.leadingAnchor],
+            [rowButton.trailingAnchor constraintEqualToAnchor:settingsBtn.leadingAnchor constant:-4],
+            [rowButton.bottomAnchor constraintEqualToAnchor:row.bottomAnchor],
+
+            [iconView.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:8],
             [iconView.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
-            [iconView.widthAnchor constraintEqualToConstant:12],
-            [iconView.heightAnchor constraintEqualToConstant:12],
+            [iconView.widthAnchor constraintEqualToConstant:18],
+            [iconView.heightAnchor constraintEqualToConstant:18],
 
-            [label.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:isLoader ? 38 : 4],
+            [label.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:isLoader ? 44 : 8],
             [label.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
-            [label.trailingAnchor constraintEqualToAnchor:settingsBtn.leadingAnchor constant:-2],
+            [label.trailingAnchor constraintLessThanOrEqualToAnchor:settingsBtn.leadingAnchor constant:-4],
 
-            [settingsBtn.trailingAnchor constraintEqualToAnchor:delBtn.leadingAnchor constant:-2],
+            [settingsBtn.trailingAnchor constraintEqualToAnchor:delBtn.leadingAnchor constant:-4],
             [settingsBtn.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
-            [settingsBtn.widthAnchor constraintEqualToConstant:16],
-            [settingsBtn.heightAnchor constraintEqualToConstant:16],
+            [settingsBtn.widthAnchor constraintEqualToConstant:32],
+            [settingsBtn.heightAnchor constraintEqualToConstant:32],
 
-            [delBtn.trailingAnchor constraintEqualToAnchor:row.trailingAnchor constant:-2],
+            [delBtn.trailingAnchor constraintEqualToAnchor:row.trailingAnchor constant:-4],
             [delBtn.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
-            [delBtn.widthAnchor constraintEqualToConstant:18],
-            [delBtn.heightAnchor constraintEqualToConstant:18],
+            [delBtn.widthAnchor constraintEqualToConstant:32],
+            [delBtn.heightAnchor constraintEqualToConstant:32],
 
-            [row.heightAnchor constraintEqualToConstant:24],
+            [row.heightAnchor constraintEqualToConstant:44],
         ]];
         [NSLayoutConstraint activateConstraints:constraints];
 
@@ -359,6 +385,13 @@
 }
 
 #pragma mark - Actions
+
+- (void)versionRowTapped:(UIButton *)sender {
+    [HapticManager.shared play:HapticTypeLight];
+    UIView *row = sender.superview;
+    NSString *versionId = objc_getAssociatedObject(row, @selector(versionTapped:));
+    if (self.delegate && versionId) [self.delegate rightPanelDidSelectVersion:versionId];
+}
 
 - (void)versionTapped:(UITapGestureRecognizer *)tap {
     [HapticManager.shared play:HapticTypeLight];

@@ -17,7 +17,9 @@
 }
 
 + (Class)layerClass {
-    if ([[PLProfiles resolveKeyForCurrentProfile:@"renderer"] hasPrefix:@"libOSMesa"]) {
+    NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+    if ([renderer isEqualToString:@ RENDERER_NAME_VK_ZINK] ||
+        [renderer isEqualToString:@ RENDERER_NAME_VK_ZINK_LEGACY]) {
         return CALayer.class;
     } else {
         return CAMetalLayer.class;

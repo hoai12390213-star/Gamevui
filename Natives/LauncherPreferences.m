@@ -144,6 +144,7 @@ NSArray* getRendererKeys(BOOL containsDefault) {
         @ RENDERER_NAME_MOBILEGLUES,
         @ RENDERER_NAME_LTW,
         @ RENDERER_NAME_VK_ZINK,
+        @ RENDERER_NAME_VK_ZINK_LEGACY,
         @ RENDERER_NAME_MOLTENVK
     ].mutableCopy;
 
@@ -166,6 +167,7 @@ NSArray* getRendererNames(BOOL containsDefault) {
         localize(@"preference.title.renderer.debug.mg", nil),
         localize(@"preference.title.renderer.debug.ltw", nil),
         localize(@"preference.title.renderer.debug.zink", nil),
+        localize(@"preference.title.renderer.debug.zink_legacy", nil),
         localize(@"preference.title.renderer.debug.vulkan", nil)
     };
     for (int i = 0; i < sizeof(names)/sizeof(names[0]); i++) {

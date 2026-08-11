@@ -7,6 +7,8 @@
 #import <UIKit/UIKit.h>
 
 NSString *const ZinkPrefSection = @"zink";
+NSString *const ZinkLegacyPrefSection = @"zink_legacy";
+static NSString *_activeZinkPrefSection = @"zink";
 static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
 
 @implementation ZinkConfig
@@ -266,9 +268,22 @@ static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
     }
 }
 
++ (NSString *)zinkPrefKey:(NSString *)suffix {
+    return [NSString stringWithFormat:@"%@.%@", _activeZinkPrefSection, suffix];
+}
+
 + (BOOL)isZinkRenderSelected {
     NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
-    return [renderer hasPrefix:@"libOSMesa"];
+    return [renderer isEqualToString:@ RENDERER_NAME_VK_ZINK];
+}
+
++ (BOOL)isZinkLegacyRenderSelected {
+    NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+    return [renderer isEqualToString:@ RENDERER_NAME_VK_ZINK_LEGACY];
+}
+
++ (BOOL)isAnyZinkRenderSelected {
+    return [self isZinkRenderSelected] || [self isZinkLegacyRenderSelected];
 }
 
 #pragma mark - Environment Setup
@@ -366,7 +381,7 @@ static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
     AppleGPUGeneration gen = [self deviceGPUGeneration];
     NSString *genName = [self deviceGPUGenerationName];
 
-    id rawLevel = getPrefObject(@"zink.optimization_level");
+    id rawLevel = getPrefObject([self zinkPrefKey:@"optimization_level"]);
     ZinkOptimizationLevel level = ZinkOptimizationLevelAuto;
     if (rawLevel) {
         level = (ZinkOptimizationLevel)[rawLevel integerValue];
@@ -403,17 +418,17 @@ static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
         default: resolvedLevelName = @"Unknown"; break;
     }
 
-    id glOverride = getPrefObject(@"zink.gl_override");
+    id glOverride = getPrefObject([self zinkPrefKey:@"gl_override"]);
     NSString *glVer = (glOverride && [glOverride isKindOfClass:[NSString class]] && [glOverride length] > 0 && ![(NSString *)glOverride isEqualToString:@"0"])
         ? (NSString *)glOverride : @"4.1 (from level)";
 
-    id glThread = getPrefObject(@"zink.enable_gl_thread");
+    id glThread = getPrefObject([self zinkPrefKey:@"enable_gl_thread"]);
     NSString *glThreadStr = glThread ? ([glThread boolValue] ? @"YES" : @"NO") : @"YES";
 
-    id cacheSize = getPrefObject(@"zink.glsl_cache_size");
+    id cacheSize = getPrefObject([self zinkPrefKey:@"glsl_cache_size"]);
     NSString *cacheStr = cacheSize ? [NSString stringWithFormat:@"%ld MB", (long)[cacheSize integerValue]] : @"32 MB";
 
-    id apiFeatures = getPrefObject(@"zink.api_features");
+    id apiFeatures = getPrefObject([self zinkPrefKey:@"api_features"]);
     NSString *apiStr;
     if (apiFeatures) {
         NSInteger apiVal = [apiFeatures integerValue];
@@ -444,7 +459,7 @@ static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
 }
 
 + (void)applyZinkEnvironmentFromPreferences {
-    id rawLevel = getPrefObject(@"zink.optimization_level");
+    id rawLevel = getPrefObject([self zinkPrefKey:@"optimization_level"]);
     ZinkOptimizationLevel level = ZinkOptimizationLevelAuto;
     if (rawLevel) {
         level = (ZinkOptimizationLevel)[rawLevel integerValue];
@@ -465,7 +480,7 @@ static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
     setenv("ZINK_ACTIVE_CONFIG", summary.UTF8String, 1);
     NSLog(@"[ZinkConfig] %@", summary);
 
-    id customGlVersion = getPrefObject(@"zink.gl_override");
+    id customGlVersion = getPrefObject([self zinkPrefKey:@"gl_override"]);
     if (customGlVersion && [customGlVersion isKindOfClass:[NSString class]]) {
         NSString *verStr = (NSString *)customGlVersion;
         if ([verStr isEqualToString:@"3.3"]) {
@@ -511,7 +526,7 @@ static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
         }
     }
 
-    id enableGLThread = getPrefObject(@"zink.enable_gl_thread");
+    id enableGLThread = getPrefObject([self zinkPrefKey:@"enable_gl_thread"]);
     if (enableGLThread) {
         setenv("mesa_glthread", [enableGLThread boolValue] ? "true" : "false", 1);
     } else {
@@ -543,7 +558,7 @@ static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
         }
     }
 
-    id cacheSize = getPrefObject(@"zink.glsl_cache_size");
+    id cacheSize = getPrefObject([self zinkPrefKey:@"glsl_cache_size"]);
     if (cacheSize && [cacheSize integerValue] > 0) {
         char buf[16];
         snprintf(buf, sizeof(buf), "%ld", (long)[cacheSize integerValue]);
@@ -551,7 +566,7 @@ static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
         setenv("MESA_SHADER_CACHE_MAX_SIZE", buf, 1);
     }
 
-    id customAPIOverride = getPrefObject(@"zink.api_features");
+    id customAPIOverride = getPrefObject([self zinkPrefKey:@"api_features"]);
     if (customAPIOverride) {
         NSInteger apiVal = [customAPIOverride integerValue];
         ZinkAPIFeatures baseFeatures = [self supportedAPIFeatures];
@@ -582,6 +597,21 @@ static AppleGPUGeneration _cachedGPUGeneration = AppleGPUGenerationUnknown;
         }
         [self applyZinkAPIFeatureOverride:enabledFeatures];
     }
+}
+
++ (void)applyZinkLegacyEnvironmentFromPreferences {
+    NSString *previous = _activeZinkPrefSection;
+    _activeZinkPrefSection = ZinkLegacyPrefSection;
+    [self applyZinkEnvironmentFromPreferences];
+    _activeZinkPrefSection = previous;
+}
+
++ (NSString *)activeLegacyConfigSummary {
+    NSString *previous = _activeZinkPrefSection;
+    _activeZinkPrefSection = ZinkLegacyPrefSection;
+    NSString *summary = [self activeConfigSummary];
+    _activeZinkPrefSection = previous;
+    return summary;
 }
 
 + (NSString *)extensionDisableStringForLevel:(ZinkAPIFeatures)enabledFeatures {

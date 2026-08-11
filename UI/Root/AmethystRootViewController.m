@@ -87,8 +87,8 @@
     CGFloat rightPanelHeight = isLandscape ? bounds.size.height - safeArea.top - topBarHeight - safeArea.bottom : 0.0;
 
     if (!isLandscape) {
-        CGFloat maxPortraitPanel = MIN(280.0, MAX(220.0, bounds.size.height * 0.30));
-        rightPanelHeight = MIN(maxPortraitPanel, MAX(200.0, bounds.size.height * 0.28));
+        CGFloat maxPortraitPanel = MIN(340.0, MAX(260.0, bounds.size.height * 0.36));
+        rightPanelHeight = MIN(maxPortraitPanel, MAX(240.0, bounds.size.height * 0.34));
     }
 
     CGFloat topBarY = safeArea.top;

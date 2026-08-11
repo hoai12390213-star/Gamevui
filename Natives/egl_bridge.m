@@ -72,10 +72,15 @@ int pojavInitOpenGL() {
         // finds eglGetProcAddress via RTLD_DEFAULT.
         dlopen("@rpath/libtinygl4angle.dylib", RTLD_GLOBAL);
         set_gl_bridge_tbl();
-    } else if ([renderer hasPrefix:@"libOSMesa"]) {
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_VK_ZINK]) {
         setenv("GALLIUM_DRIVER","zink",1);
-        [ZinkConfig applyZinkEnvironmentFromPreferences];
-        // Pre-load Vulkan loader for Zink before Mesa initializes
+        // Official Amethyst Zink (libOSMesa.8.dylib) — uses default Mesa tuning
+        NSString *vkPath = [NSBundle.mainBundle.privateFrameworksPath stringByAppendingPathComponent:@"libvulkan.1.dylib"];
+        dlopen(vkPath.UTF8String, RTLD_LAZY | RTLD_GLOBAL);
+        set_osm_bridge_tbl();
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_VK_ZINK_LEGACY]) {
+        setenv("GALLIUM_DRIVER","zink",1);
+        [ZinkConfig applyZinkLegacyEnvironmentFromPreferences];
         NSString *vkPath = [NSBundle.mainBundle.privateFrameworksPath stringByAppendingPathComponent:@"libvulkan.1.dylib"];
         dlopen(vkPath.UTF8String, RTLD_LAZY | RTLD_GLOBAL);
         set_osm_bridge_tbl();

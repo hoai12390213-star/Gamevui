@@ -31,6 +31,7 @@
 #import "VersionDirectoryManager.h"
 #import "PLProfiles.h"
 #import "MinecraftResourceUtils.h"
+#import "TransitionAnimator.h"
 
 @interface MainCoordinator () <UIAlertViewDelegate> {
     CGFloat _lastMsTime;
@@ -165,7 +166,9 @@
     SettingsViewController *vc = [[SettingsViewController alloc] init];
     vc.coordinator = self;
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-    [self.rootVC presentContentAsSheet:nav];
+    nav.modalPresentationStyle = UIModalPresentationPageSheet;
+    nav.transitioningDelegate = self;
+    [self.rootVC presentViewController:nav animated:YES completion:nil];
 }
 
 - (void)showFileManager {
@@ -606,11 +609,15 @@
 #pragma mark - UIViewControllerTransitioningDelegate
 
 - (id<UIViewControllerAnimatedTransitioning>)animationControllerForPresentedController:(UIViewController *)presented presentingController:(UIViewController *)presenting sourceController:(UIViewController *)source {
-    return nil;
+    TransitionAnimator *animator = [[TransitionAnimator alloc] initWithType:TransitionTypeSlideUp];
+    animator.isPresenting = YES;
+    return animator;
 }
 
 - (id<UIViewControllerAnimatedTransitioning>)animationControllerForDismissedController:(UIViewController *)dismissed {
-    return nil;
+    TransitionAnimator *animator = [[TransitionAnimator alloc] initWithType:TransitionTypeSlideUp];
+    animator.isPresenting = NO;
+    return animator;
 }
 
 - (void)dealloc {

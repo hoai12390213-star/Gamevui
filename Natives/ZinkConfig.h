@@ -3,6 +3,7 @@
 #import <Foundation/Foundation.h>
 
 extern NSString *const ZinkPrefSection;
+extern NSString *const ZinkLegacyPrefSection;
 
 typedef NS_ENUM(NSInteger, ZinkOptimizationLevel) {
     ZinkOptimizationLevelAuto = -1,
@@ -54,13 +55,17 @@ typedef NS_ENUM(NSInteger, AppleGPUGeneration) {
 + (ZinkAPIFeatures)supportedAPIFeaturesForGPUGeneration:(AppleGPUGeneration)gen;
 + (ZinkAPIFeatures)supportedAPIFeatures;
 + (BOOL)isZinkRenderSelected;
++ (BOOL)isZinkLegacyRenderSelected;
++ (BOOL)isAnyZinkRenderSelected;
 
 + (void)applyZinkEnvironmentForOptimizationLevel:(ZinkOptimizationLevel)level;
 + (void)applyZinkEnvironmentFromPreferences;
++ (void)applyZinkLegacyEnvironmentFromPreferences;
 + (void)applyZinkAPIFeatureOverride:(ZinkAPIFeatures)enabledFeatures;
 
 + (NSString *)deviceRecommendationString;
 + (NSString *)apiSupportSummaryForGPUGeneration:(AppleGPUGeneration)gen;
 + (NSString *)activeConfigSummary;
++ (NSString *)activeLegacyConfigSummary;
 
 @end
