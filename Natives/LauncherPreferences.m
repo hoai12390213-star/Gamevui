@@ -200,6 +200,10 @@ NSArray* getLwjglVersionsWithAuto(void) {
     ].mutableCopy;
     return array;
 }
+
+// Kept out of compilation temporarily: this is a stale duplicate of the
+// preference implementation above.
+#if 0
 #import "config.h"
 #import "utils.h"
 #import "LauncherPreferences.h"
@@ -400,3 +404,4 @@ NSArray* getLwjglVersionsWithAuto(void) {
     ].mutableCopy;
     return array;
 }
+#endif
