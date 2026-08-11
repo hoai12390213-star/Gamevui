@@ -27,8 +27,8 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-8-openjdk
           export PATH="$JAVA_HOME/bin:$PATH"
           cd lwgjl/lwjgl3-wip-rebase_3.3.1
-          mkdir -p bin/classes/generator bin/classes/templates/META-INF
-          touch bin/classes/generator/touch.txt bin/classes/generator/generated-touch.txt bin/classes/templates/touch.txt
+          mkdir -p bin/classes/generator bin/classes/templates/META-INF modules/lwjgl/lwjglx/src/generated/java
+          touch bin/classes/generator/touch.txt bin/classes/generator/generated-touch.txt bin/classes/templates/touch.txt modules/lwjgl/lwjglx/src/generated/java/touch.txt
           yes | ant -Dplatform.linux=true \
             -Dbinding.assimp=false -Dbinding.bgfx=false -Dbinding.cuda=false \
             -Dbinding.egl=false -Dbinding.jawt=false -Dbinding.jemalloc=false \

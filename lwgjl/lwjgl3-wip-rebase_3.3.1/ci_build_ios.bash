@@ -27,8 +27,20 @@ if [ "$SKIP_LIBFFI" != "1" ]; then
   # Restore generator
   mv generate-darwin-source-and-headers.py.bak generate-darwin-source-and-headers.py
 
+  # Xcode still copies legacy armv7 headers even when we only build arm64.
+  IOS_INC="darwin_ios/include"
+  mkdir -p "$IOS_INC"
+  for h in ffitarget_armv7 ffi_armv7; do
+    if [ ! -f "$IOS_INC/${h}.h" ] && [ -f "$IOS_INC/${h/_armv7/_arm64}.h" ]; then
+      cp "$IOS_INC/${h/_armv7/_arm64}.h" "$IOS_INC/${h}.h"
+    elif [ ! -f "$IOS_INC/${h}.h" ]; then
+      printf '/* CI stub */\n' > "$IOS_INC/${h}.h"
+    fi
+  done
+
   # Build libffi
-  xcodebuild -arch arm64 -sdk iphoneos -target libffi-iOS || echo "Exit code: $?"
+  xcodebuild -arch arm64 -sdk iphoneos -target libffi-iOS
+  test -f build/Release-iphoneos/libffi.a
 
   # Copy libffi
   cd ..
@@ -38,14 +50,14 @@ fi
 # Download libraries
 #POJAV_NATIVES="https://github.com/PojavLauncherTeam/PojavLauncher_iOS/raw/main/Natives/resources/Frameworks"
 #wget -nc $POJAV_NATIVES/libopenal.so -P $LWJGL_NATIVE/openal
-wget -nc "https://nightly.link/PojavLauncherTeam/shaderc/workflows/ios/main/libshaderc.zip"
-unzip -o libshaderc.zip -d $LWJGL_NATIVE/shaderc
+wget -nc "https://github.com/AngelAuraMC/shaderc/releases/latest/download/libshaderc-ios.zip"
+unzip -o libshaderc-ios.zip -d $LWJGL_NATIVE/shaderc
 rm $LWJGL_NATIVE/shaderc/libshaderc_shared.1.dylib
 mv $LWJGL_NATIVE/shaderc/libshaderc_shared.dylib $LWJGL_NATIVE/shaderc/libshaderc.dylib
 
 # HACK: Skip compiling and running the generator to save time and keep LWJGLX functions
-mkdir -p bin/classes/{generator,templates/META-INF}
-touch bin/classes/{generator,templates}/touch.txt bin/classes/generator/generated-touch.txt
+mkdir -p bin/classes/{generator,templates/META-INF} modules/lwjgl/lwjglx/src/generated/java
+touch bin/classes/{generator,templates}/touch.txt bin/classes/generator/generated-touch.txt modules/lwjgl/lwjglx/src/generated/java/touch.txt
 
 # Build LWJGL 3
 ant -version
